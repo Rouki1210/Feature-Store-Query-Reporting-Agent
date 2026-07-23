@@ -19,29 +19,29 @@ SETTINGS = Settings(
 # ---------------- Truy vấn hợp lệ ----------------
 
 def test_select_passes_and_gets_limit():
-    safe = validate_sql("SELECT customer_id FROM features", SETTINGS)
+    safe = validate_sql("SELECT customer_id FROM feature.gsm_transaction", SETTINGS)
     assert safe.upper().startswith("SELECT")
     assert "LIMIT 100" in safe.upper()
 
 
 def test_with_cte_passes():
-    sql = "WITH t AS (SELECT customer_id FROM features) SELECT customer_id FROM t"
+    sql = "WITH t AS (SELECT customer_id FROM feature.gsm_transaction) SELECT customer_id FROM t"
     assert is_safe(sql, SETTINGS)
 
 
 def test_count_star_is_allowed():
     # COUNT(*) hợp lệ; chỉ 'SELECT *' mới bị chặn.
-    safe = validate_sql("SELECT COUNT(*) AS n FROM features", SETTINGS)
+    safe = validate_sql("SELECT COUNT(*) AS n FROM feature.gsm_transaction", SETTINGS)
     assert "COUNT(*)" in safe.upper()
 
 
 def test_existing_limit_within_cap_is_kept():
-    safe = validate_sql("SELECT customer_id FROM features LIMIT 10", SETTINGS)
+    safe = validate_sql("SELECT customer_id FROM feature.gsm_transaction LIMIT 10", SETTINGS)
     assert "LIMIT 10" in safe.upper()
 
 
 def test_existing_limit_over_cap_is_clamped():
-    safe = validate_sql("SELECT customer_id FROM features LIMIT 999999", SETTINGS)
+    safe = validate_sql("SELECT customer_id FROM feature.gsm_transaction LIMIT 999999", SETTINGS)
     assert "LIMIT 100" in safe.upper()
     assert "999999" not in safe
 
@@ -75,34 +75,60 @@ def test_stacked_statements_rejected():
 
 def test_comment_hidden_ddl_stripped_then_safe():
     # Comment bị strip -> phần thực thi vẫn chỉ là SELECT.
-    safe = validate_sql("SELECT customer_id FROM features /* DROP TABLE x */", SETTINGS)
+    safe = validate_sql("SELECT customer_id FROM feature.gsm_transaction /* DROP TABLE x */", SETTINGS)
     assert safe.upper().startswith("SELECT")
 
 
 def test_comment_cannot_smuggle_execution():
     # '-- ; DELETE' là comment, không thực thi; nhưng nếu DELETE nằm NGOÀI comment thì chặn.
     with pytest.raises(GuardError):
-        validate_sql("SELECT 1 FROM features\nUNION SELECT 1 FROM features; DELETE FROM features", SETTINGS)
+        validate_sql("SELECT 1 FROM feature.gsm_transaction\nUNION SELECT 1 FROM feature.gsm_transaction; DELETE FROM feature.gsm_transaction", SETTINGS)
 
 
 # ---------------- Chặn SELECT * và cột nhạy cảm ----------------
 
 def test_select_star_rejected():
     with pytest.raises(GuardError):
-        validate_sql("SELECT * FROM features", SETTINGS)
+        validate_sql("SELECT * FROM feature.gsm_transaction", SETTINGS)
 
 
 def test_qualified_star_rejected():
     with pytest.raises(GuardError):
-        validate_sql("SELECT f.* FROM features f", SETTINGS)
+        validate_sql("SELECT f.* FROM feature.gsm_transaction f", SETTINGS)
 
 
 @pytest.mark.parametrize("col", ["phone", "email", "national_id", "customer_name"])
 def test_sensitive_columns_rejected(col):
     with pytest.raises(GuardError):
-        validate_sql(f"SELECT {col} FROM customers", SETTINGS)
+        validate_sql(f"SELECT {col} FROM feature.gsm_transaction", SETTINGS)
 
 
 def test_empty_sql_rejected():
     with pytest.raises(GuardError):
         validate_sql("   ", SETTINGS)
+
+
+def test_raw_schema_and_unqualified_table_rejected():
+    with pytest.raises(GuardError):
+        validate_sql("SELECT customer_id FROM raw.customers", SETTINGS)
+    with pytest.raises(GuardError):
+        validate_sql("SELECT customer_id FROM customers", SETTINGS)
+
+
+def test_metadata_schema_allowed():
+    assert is_safe("SELECT feature_name FROM metadata.feature_catalog", SETTINGS)
+
+
+@pytest.mark.parametrize("sql", [
+    "SELECT version()",
+    "SELECT pg_sleep(1) FROM metadata.feature_catalog",
+    "SELECT pg_read_file('/etc/passwd') FROM metadata.feature_catalog",
+])
+def test_system_or_side_effect_functions_rejected(sql):
+    with pytest.raises(GuardError):
+        validate_sql(sql, SETTINGS)
+
+
+def test_query_must_reference_approved_table():
+    with pytest.raises(GuardError):
+        validate_sql("SELECT 1", SETTINGS)

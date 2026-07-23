@@ -21,6 +21,12 @@ from app.semantic.feature_describer import describe
 from app.semantic.feature_spec import GROUPS, TABLES, all_features
 
 
+def _support_status(name: str) -> str:
+    if "nvso" in name or "_wo_" in name:
+        return "needs_review"
+    return "queryable"
+
+
 def build() -> dict:
     features = []
     for feat in all_features():
@@ -28,11 +34,19 @@ def build() -> dict:
         features.append({
             "name": feat.name,
             "table": feat.table,
+            "business_unit": "GSM" if feat.table.endswith("gsm_transaction") else "VINFAST",
             "group": feat.group,
             "dtype": feat.dtype,
+            "aggregation": feat.agg,
+            "window": feat.window,
+            "unit": feat.unit,
+            "null_meaning": feat.null_meaning_key,
             "description_vi": desc_vi,
             "description_en": desc_en,
             "keywords": keywords,   # gộp cả VI lẫn EN
+            "support_status": _support_status(feat.name),
+            "is_queryable": True,
+            "is_active": True,
         })
     return {
         "meta": {
@@ -52,7 +66,7 @@ def main() -> None:
     data = build()
     with open(out_path, "w", encoding="utf-8") as fh:
         yaml.safe_dump(data, fh, allow_unicode=True, sort_keys=False, width=120)
-    print(f"✓ Đã sinh {data['meta']['feature_count']} feature → {out_path}")
+    print(f"Generated {data['meta']['feature_count']} features -> {out_path}")
 
 
 if __name__ == "__main__":

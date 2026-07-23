@@ -24,6 +24,10 @@ class RetrievedFeature(BaseModel):
     description_vi: str
     description_en: str = ""
     score: float
+    support_status: str = "queryable"
+    dtype: str | None = None
+    unit: str | None = None
+    null_meaning: str | None = None
 
 
 class QueryResult(BaseModel):
@@ -52,6 +56,10 @@ class AskResponse(BaseModel):
     repairs: int = Field(default=0, description="Số lần tự sửa SQL đã dùng")
     clarifying_question: str | None = None
     error: str | None = None
+    pipeline_trace: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Trace các stage đã chạy: router, retriever, generator, validator, executor, narrator.",
+    )
 
 
 class FeatureSummary(BaseModel):

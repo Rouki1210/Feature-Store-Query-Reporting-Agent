@@ -31,12 +31,23 @@ _FORBIDDEN = {
     "VACUUM", "EXEC", "EXECUTE", "CALL", "COPY", "INTO", "REINDEX", "ANALYZE",
     "COMMIT", "ROLLBACK", "SAVEPOINT", "SET", "LOAD",
 }
+_FORBIDDEN_FUNCTIONS = {
+    "pg_read_file", "pg_read_binary_file", "pg_ls_dir", "pg_stat_file",
+    "pg_sleep", "pg_sleep_for", "pg_sleep_until", "dblink", "dblink_exec",
+    "lo_import", "lo_export", "lo_unlink", "pg_notify",
+}
 
 _SELECT_STAR = re.compile(r"select\s+(distinct\s+)?\*", re.IGNORECASE)
 _QUALIFIED_STAR = re.compile(r"[\w`\"\]]\s*\.\s*\*", re.IGNORECASE)  # t.*  "t".*
 _LIMIT_RE = re.compile(r"\blimit\s+(\d+)\b", re.IGNORECASE)
 _LINE_COMMENT = re.compile(r"--[^\n]*")
 _BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+_TABLE_REF = re.compile(
+    r'\b(?:from|join)\s+((?:"?[A-Za-z_]\w*"?\.)?"?[A-Za-z_]\w*"?)',
+    re.IGNORECASE,
+)
+_CTE_NAME = re.compile(r'(?:\bwith|,)\s*"?([A-Za-z_]\w*)"?\s+as\s*\(', re.IGNORECASE)
+ALLOWED_SCHEMAS = frozenset({"feature", "metadata"})
 
 
 def _resolve_settings(settings: Any) -> tuple[list[str], int]:
@@ -79,6 +90,9 @@ def _check_forbidden(sql: str) -> None:
     for kw in _FORBIDDEN:
         if re.search(rf"\b{kw}\b", upper):
             raise GuardError(f"Từ khóa bị cấm: {kw}. Chỉ cho phép truy vấn đọc.")
+    for fn in _FORBIDDEN_FUNCTIONS:
+        if re.search(rf"\b{re.escape(fn)}\s*\(", sql, re.IGNORECASE):
+            raise GuardError(f"Function bị cấm: {fn}.")
 
 
 def _check_star(sql: str) -> None:
@@ -93,6 +107,29 @@ def _check_sensitive_columns(sql: str, sensitive: list[str]) -> None:
         if re.search(rf"\b{re.escape(col)}\b", low):
             raise GuardError(
                 f"Cột nhạy cảm bị chặn: '{col}'. Không được truy vấn cột này."
+            )
+
+
+def referenced_tables(sql: str) -> list[str]:
+    return [m.group(1).replace('"', "").lower() for m in _TABLE_REF.finditer(sql)]
+
+
+def _check_table_allowlist(sql: str) -> None:
+    ctes = {m.group(1).lower() for m in _CTE_NAME.finditer(sql)}
+    tables = referenced_tables(sql)
+    if not tables:
+        raise GuardError("Truy vấn phải tham chiếu ít nhất một bảng feature hoặc metadata.")
+    for table in tables:
+        if "." not in table:
+            if table in ctes:
+                continue
+            raise GuardError(
+                f"Bảng '{table}' phải có schema và chỉ được thuộc feature hoặc metadata."
+            )
+        schema = table.split(".", 1)[0]
+        if schema not in ALLOWED_SCHEMAS:
+            raise GuardError(
+                f"Schema '{schema}' không được phép. Chỉ cho phép feature và metadata."
             )
 
 
@@ -128,6 +165,7 @@ def validate_sql(sql: str, settings: Any = None) -> str:
     _check_forbidden(body)
     _check_star(body)
     _check_sensitive_columns(body, sensitive)
+    _check_table_allowlist(body)
 
     return _enforce_row_limit(body, max_rows)
 

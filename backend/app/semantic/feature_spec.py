@@ -1,145 +1,227 @@
-"""Đặc tả feature — NGUỒN CHÂN LÝ DUY NHẤT.
+"""Canonical Sprint 1 feature inventory.
 
-Cả bộ sinh mock data (derive feature từ raw events) và semantic layer đều đọc
-từ đây, nên tên cột trong DB luôn khớp tên feature trong semantic layer.
-
-Ngữ pháp tên feature (CLAUDE.md mục 2):
-    {table}_{filter}_{metric}_{aggregation}_{window}
-
-Trọng tâm là `global_loyalty` — cầu nối liên PnL: điểm khách EARN ở GSM và BURN
-ở VinFast nằm cùng một bảng, cùng một khách. Đây là năng lực khác biệt của dự án
-nên được ưu tiên phủ đầy đủ.
+The workbook names are table-prefixed; physical columns and SQL generation use
+the unprefixed feature name.  This module is the single source for the 167 GSM
+and 186 VinFast retained features.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
 
-# --- Bảng trong phạm vi (3 bảng, mục 2). gsm_event bị hoãn có chủ đích. ---
-TABLES: dict[str, dict[str, str]] = {
-    "gsm_transaction": {"unit": "GSM", "vi": "GSM — di chuyển & giao hàng"},
-    "vinfast_transaction": {"unit": "VinFast", "vi": "VinFast — xe & phụ kiện"},
-    "global_loyalty": {"unit": "Global", "vi": "Điểm thưởng liên PnL (cầu nối)"},
+TABLES = {
+    "feature.gsm_transaction": {
+        "unit": "GSM",
+        "vi": "GSM — chuyến đi và giao hàng",
+        "en": "GSM — rides and delivery",
+    },
+    "feature.vinfast_transaction": {
+        "unit": "VINFAST",
+        "vi": "VinFast — giao dịch xe, phụ kiện và dịch vụ",
+        "en": "VinFast — vehicle, accessories and service transactions",
+    },
 }
 
-# 7 nhóm feature có sẵn trong dữ liệu nguồn (mục 4 — tiered retrieval).
 GROUPS = [
     "Giá trị & số dư",
     "Hành trình & trạng thái",
     "Thời gian & gắn kết",
     "Tỷ lệ & xu hướng",
-    "Kênh & ngữ cảnh",
     "Sản phẩm & dịch vụ",
     "Hoạt động & tần suất",
 ]
 
-# Cửa sổ thời gian dùng cho scaffold. Ngữ pháp đầy đủ còn daily/l1w/l2w — mở rộng
-# bằng cách thêm vào đây; bộ derive & describer tự sinh theo.
-WINDOWS = ["l1m", "l3m", "l6m", "l12m"]
-# Feature tỷ lệ TÍNH SẴN — luôn ưu tiên hơn chia hai cột trong SQL (mục 2).
-RATIOS = [("l1m", "l3m"), ("l1m", "l12m")]
+WINDOW_DAYS = {
+    "daily": 1,
+    "l1w": 7,
+    "l2w": 14,
+    "l4w": 28,
+    "l1m": 30,
+    "l2m": 60,
+    "l3m": 90,
+    "l6m": 180,
+    "l8w": 56,
+    "l12m": 365,
+}
 
-# 11 PnL trong cầu nối loyalty (mục 2).
-PNLS = [
-    "gsm", "vinfast", "vinhomes", "vinmec", "vinpearl", "vinschool",
-    "vinclub", "vincomretail", "merchant", "vapp", "fgf",
-]
+RATIO_WINDOWS = (
+    "l1m_vs_l3m",
+    "l1m_vs_l6m",
+    "l1m_vs_l12m",
+    "l3m_vs_l12m",
+)
+GSM_RATIO_WINDOWS = ("l1m_vs_l3m", "l1m_vs_l6m", "l3m_vs_l12m")
 
 
-@dataclass
+@dataclass(frozen=True)
 class Feature:
-    """Một feature đã phân giải thành các thành phần.
-
-    `components` mang đủ thông tin để (a) describer sinh mô tả tiếng Việt và
-    (b) bộ mock derive tính đúng cột đó từ raw events.
-    """
-
     name: str
     table: str
     group: str
-    dtype: str  # "numeric" | "categorical"
+    dtype: str
+    metric: str
+    window: str | None = None
+    agg: str = "sum"
+    unit: str | None = None
+    null_meaning_key: str | None = "no_event_in_window"
     components: dict[str, Any] = field(default_factory=dict)
 
 
-# --- Chỉ định base-metric cho hai bảng giao dịch ---
-# metric_token: (aggregation_token, group, source_field, vi_metric)
-_TXN_METRICS: dict[str, dict[str, tuple[str, str, str, str]]] = {
-    "gsm_transaction": {
-        "txn": ("count", "Hoạt động & tần suất", "*", "số chuyến hoàn thành"),
-        "gmv": ("sum", "Giá trị & số dư", "original_price", "tổng giá trị giao dịch (GMV)"),
-        "discount": ("sum", "Giá trị & số dư", "discount", "tổng chiết khấu"),
-        "distance_km": ("sum", "Hành trình & trạng thái", "distance_km", "tổng quãng đường (km)"),
-    },
-    "vinfast_transaction": {
-        "txn": ("count", "Hoạt động & tần suất", "*", "số đơn hoàn thành"),
-        "gmv": ("sum", "Giá trị & số dư", "original_price", "tổng giá trị đơn hàng (GMV)"),
-        "discount": ("sum", "Giá trị & số dư", "discount", "tổng chiết khấu"),
-    },
+_GSM_STEMS: dict[str, tuple[str, ...]] = {
+    "canceled_original_price_max": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "canceled_original_price_sum": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "canceled_txn_active_day_count": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "canceled_txn_count": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "canceled_weekday_original_price_sum": ("l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "canceled_weekday_txn_count": ("l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "completed_discount_amount_sum": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "completed_original_price_max": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "completed_original_price_sum": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m", *GSM_RATIO_WINDOWS),
+    "completed_trip_distance_km_sum": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m", *GSM_RATIO_WINDOWS),
+    "completed_txn_active_day_count": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "completed_txn_count": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "completed_weekday_original_price_sum": ("l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "completed_weekday_txn_count": ("l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "days_since_first_txn": ("l12m",),
+    "days_since_last_txn": ("l12m",),
+    "finished_original_price_max": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "finished_original_price_sum": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "finished_time_daytime_original_price_sum": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "finished_time_daytime_txn_count": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "finished_txn_active_day_count": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "finished_txn_count": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m", *GSM_RATIO_WINDOWS),
+    "finished_type_bike_txn_count": ("l1w", "l2w"),
+    "finished_type_express_txn_count": ("l1w", "l2w"),
+    "finished_type_food_txn_count": ("l1w", "l2w"),
+    "finished_type_taxi_txn_count": ("l1w", "l2w"),
+    "finished_weekday_original_price_sum": ("l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "finished_weekday_txn_count": ("l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
 }
 
-# Bảng nguồn (raw events) cho mỗi bảng giao dịch.
-_TXN_SOURCE = {
-    "gsm_transaction": "gsm_trips",
-    "vinfast_transaction": "vinfast_orders",
+_VF_STEMS: dict[str, tuple[str, ...]] = {
+    "days_since_first_completed_txn_days": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "days_since_last_completed_txn_days": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "txn_accessories_canceled_amount_sum": RATIO_WINDOWS,
+    "txn_accessories_canceled_count": RATIO_WINDOWS,
+    "txn_accessories_canceled_price_sum": RATIO_WINDOWS,
+    "txn_accessories_completed_amount_sum": RATIO_WINDOWS,
+    "txn_accessories_completed_count": ("l12m", *RATIO_WINDOWS),
+    "txn_accessories_completed_price_sum": ("l12m", *RATIO_WINDOWS),
+    "txn_canceled_active_day_count": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "txn_canceled_amount_sum": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "txn_canceled_count": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "txn_canceled_price_sum": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "txn_canceled_processing_time_max": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "txn_canceled_processing_time_min": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "txn_completed_active_day_count": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "txn_completed_amount_sum": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "txn_completed_battery_sum": ("l12m",),
+    "txn_completed_count": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "txn_completed_price_sum": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "txn_completed_processing_time_max": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "txn_completed_processing_time_min": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "txn_discount_accessories_completed_count": ("l12m",),
+    "txn_discount_canceled_count": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "txn_discount_completed_count": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "txn_discount_delivered_count": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "txn_discount_nvso_completed_count": ("l12m",),
+    "txn_first_completed_updated_date_min": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "txn_last_completed_updated_date_max": ("daily", "l1w", "l2w", "l1m", "l3m", "l6m", "l12m"),
+    "txn_wo_canceled_amount_sum": RATIO_WINDOWS,
+    "txn_wo_canceled_count": RATIO_WINDOWS,
+    "txn_wo_canceled_price_sum": RATIO_WINDOWS,
+    "txn_wo_completed_amount_sum": RATIO_WINDOWS,
+    "txn_wo_completed_count": RATIO_WINDOWS,
+    "txn_wo_completed_price_sum": RATIO_WINDOWS,
 }
 
 
-def _txn_features() -> list[Feature]:
-    out: list[Feature] = []
-    for table, metrics in _TXN_METRICS.items():
-        source = _TXN_SOURCE[table]
-        for metric, (agg, group, src_field, vi_metric) in metrics.items():
-            for w in WINDOWS:
-                name = f"{table}_completed_{metric}_{agg}_{w}"
-                out.append(Feature(
-                    name=name, table=table, group=group, dtype="numeric",
-                    components={
-                        "kind": "txn_base", "source": source, "metric": metric,
-                        "agg": agg, "src_field": src_field, "window": w,
-                        "vi_metric": vi_metric, "filter": "completed",
-                    },
-                ))
-            # Feature tỷ lệ tính sẵn.
-            for num, den in RATIOS:
-                name = f"{table}_completed_{metric}_{agg}_{num}_vs_{den}"
-                out.append(Feature(
-                    name=name, table=table, group="Tỷ lệ & xu hướng", dtype="numeric",
-                    components={
-                        "kind": "ratio", "source": source, "metric": metric,
-                        "agg": agg, "src_field": src_field,
-                        "num_window": num, "den_window": den, "vi_metric": vi_metric,
-                    },
-                ))
-    return out
+def _group(stem: str, table: str, agg: str) -> str:
+    if agg == "ratio":
+        return "Tỷ lệ & xu hướng"
+    if any(x in stem for x in ("date", "days_since", "active_day", "weekday", "daytime", "processing_time")):
+        return "Thời gian & gắn kết"
+    if any(x in stem for x in ("amount", "price", "discount", "battery")):
+        return "Giá trị & số dư"
+    if any(x in stem for x in ("accessories", "wo_", "type_")):
+        return "Sản phẩm & dịch vụ"
+    if "count" in stem:
+        return "Hoạt động & tần suất"
+    return "Hành trình & trạng thái"
 
 
-def _loyalty_features() -> list[Feature]:
+def _dtype(stem: str, window: str) -> str:
+    if "_date_" in stem:
+        return "date"
+    if window in RATIO_WINDOWS:
+        return "ratio"
+    if "count" in stem or "days_since" in stem or "active_day_count" in stem:
+        return "integer"
+    return "numeric"
+
+
+def _agg(stem: str, window: str) -> str:
+    if window in RATIO_WINDOWS:
+        return "ratio"
+    if "count" in stem:
+        return "count"
+    if stem.endswith("_max"):
+        return "max"
+    if stem.endswith("_min"):
+        return "min"
+    if "days_since" in stem:
+        return "derived"
+    return "sum"
+
+
+def _unit(stem: str, dtype: str) -> str | None:
+    if dtype == "integer" and "days" in stem:
+        return "days"
+    if "distance_km" in stem:
+        return "km"
+    if "processing_time" in stem:
+        return "minutes"
+    if "battery" in stem:
+        return "kWh"
+    if dtype in {"numeric", "ratio"}:
+        return "VND" if any(x in stem for x in ("amount", "price")) else None
+    return "transactions" if dtype == "integer" and "count" in stem else None
+
+
+def _build(table: str, stems: dict[str, tuple[str, ...]]) -> list[Feature]:
     out: list[Feature] = []
-    for pnl in PNLS:
-        for direction in ("earn", "burn"):
-            for metric, agg in (("pts", "sum"), ("txn", "count")):
-                group = "Giá trị & số dư" if metric == "pts" else "Hoạt động & tần suất"
-                for w in WINDOWS:
-                    name = f"global_loyalty_pnl_{pnl}_{direction}_completed_{metric}_{agg}_{w}"
-                    out.append(Feature(
-                        name=name, table="global_loyalty", group=group, dtype="numeric",
-                        components={
-                            "kind": "loyalty", "pnl": pnl, "direction": direction,
-                            "metric": metric, "agg": agg, "window": w,
-                        },
-                    ))
-    # PnL chủ đạo — CHỈ tồn tại ở l6m/l12m (mục 2, ràng buộc quan trọng).
-    for direction in ("earn", "burn"):
-        for w in ("l6m", "l12m"):
-            name = f"global_loyalty_primary_{direction}_pnl_{w}"
-            out.append(Feature(
-                name=name, table="global_loyalty", group="Kênh & ngữ cảnh",
-                dtype="categorical",
-                components={"kind": "loyalty_primary", "direction": direction, "window": w},
-            ))
+    for stem, windows in stems.items():
+        for window in windows:
+            agg = _agg(stem, window)
+            dtype = _dtype(stem, window)
+            null_key = "zero_denominator" if agg == "ratio" else (
+                "never_event" if "days_since" in stem else "no_event_in_window"
+            )
+            out.append(
+                Feature(
+                    name=f"{stem}_{window}",
+                    table=table,
+                    group=_group(stem, table, agg),
+                    dtype=dtype,
+                    metric=stem,
+                    window=window,
+                    agg=agg,
+                    unit=_unit(stem, dtype),
+                    null_meaning_key=null_key,
+                    components={"stem": stem, "window": window, "table": table},
+                )
+            )
     return out
 
 
 def all_features() -> list[Feature]:
-    """Toàn bộ feature trong phạm vi (đã phân giải thành phần)."""
-    return _txn_features() + _loyalty_features()
+    features = _build("feature.gsm_transaction", _GSM_STEMS) + _build(
+        "feature.vinfast_transaction", _VF_STEMS
+    )
+    if len(features) != 353:
+        raise RuntimeError(f"Canonical inventory must contain 353 features, got {len(features)}")
+    return features
+
+
+def feature_names() -> set[str]:
+    return {f.name for f in all_features()}

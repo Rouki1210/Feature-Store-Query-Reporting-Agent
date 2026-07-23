@@ -28,3 +28,4 @@ pandas>=2.2
 # --- Dev / test ---
 pytest>=8.3
 httpx>=0.28
+streamlit>=1.40

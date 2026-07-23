@@ -37,9 +37,12 @@ class Settings(BaseSettings):
         alias="SQL_SENSITIVE_COLUMNS",
     )
     sql_max_repairs: int = Field(default=2, alias="SQL_MAX_REPAIRS")
+    llm_timeout_seconds: float = Field(default=30.0, alias="LLM_TIMEOUT_SECONDS")
+    llm_network_retries: int = Field(default=1, alias="LLM_NETWORK_RETRIES")
+    agent_max_question_chars: int = Field(default=2000, alias="AGENT_MAX_QUESTION_CHARS")
 
     # ---- Retrieval ----
-    retrieval_top_k: int = Field(default=25, alias="RETRIEVAL_TOP_K")
+    retrieval_top_k: int = Field(default=8, alias="RETRIEVAL_TOP_K")
 
     # ---- App ----
     semantic_layer_path: str = Field(

@@ -1,7 +1,14 @@
-"""Schema khởi tạo: 4 bảng raw events + bảng features (222 cột, sinh từ feature_spec).
+"""Schema khởi tạo Sprint 1 — áp file SQL canonical trong db/schema/.
 
-Cột feature được liệt kê LITERAL tại thời điểm viết migration — feature_spec đổi
-về sau phải là một migration mới, không sửa file này.
+Nguồn sự thật là `backend/db/schema/sprint1_feature_store_schema_postgresql.sql`
+(5 schema: raw / feature / metadata / agent / eval; grain customer_id +
+snapshot_date; catalog + synonyms trong DB; query/validation log; bảng eval).
+
+Migration này CHỈ chạy trên PostgreSQL (TIMESTAMPTZ, JSONB, generated columns,
+schema, role) — không có đường SQLite. Dev dùng docker Postgres 16.
+
+Lưu ý: mục 7–8 của file SQL (CREATE ROLE / GRANT / REVOKE) cần tài khoản có
+quyền CREATEROLE — user `postgres` mặc định trong docker là superuser nên ổn.
 
 Revision ID: 0001
 Revises:
@@ -9,309 +16,47 @@ Create Date: 2026-07-23
 """
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 from alembic import op
-import sqlalchemy as sa
 
 revision = "0001"
 down_revision = None
 branch_labels = None
 depends_on = None
 
-# (tên cột, dtype) — "numeric" -> DOUBLE PRECISION, "categorical" -> TEXT
-FEATURE_COLUMNS: list[tuple[str, str]] = [
-    ("gsm_transaction_completed_txn_count_l1m", "numeric"),
-    ("gsm_transaction_completed_txn_count_l3m", "numeric"),
-    ("gsm_transaction_completed_txn_count_l6m", "numeric"),
-    ("gsm_transaction_completed_txn_count_l12m", "numeric"),
-    ("gsm_transaction_completed_txn_count_l1m_vs_l3m", "numeric"),
-    ("gsm_transaction_completed_txn_count_l1m_vs_l12m", "numeric"),
-    ("gsm_transaction_completed_gmv_sum_l1m", "numeric"),
-    ("gsm_transaction_completed_gmv_sum_l3m", "numeric"),
-    ("gsm_transaction_completed_gmv_sum_l6m", "numeric"),
-    ("gsm_transaction_completed_gmv_sum_l12m", "numeric"),
-    ("gsm_transaction_completed_gmv_sum_l1m_vs_l3m", "numeric"),
-    ("gsm_transaction_completed_gmv_sum_l1m_vs_l12m", "numeric"),
-    ("gsm_transaction_completed_discount_sum_l1m", "numeric"),
-    ("gsm_transaction_completed_discount_sum_l3m", "numeric"),
-    ("gsm_transaction_completed_discount_sum_l6m", "numeric"),
-    ("gsm_transaction_completed_discount_sum_l12m", "numeric"),
-    ("gsm_transaction_completed_discount_sum_l1m_vs_l3m", "numeric"),
-    ("gsm_transaction_completed_discount_sum_l1m_vs_l12m", "numeric"),
-    ("gsm_transaction_completed_distance_km_sum_l1m", "numeric"),
-    ("gsm_transaction_completed_distance_km_sum_l3m", "numeric"),
-    ("gsm_transaction_completed_distance_km_sum_l6m", "numeric"),
-    ("gsm_transaction_completed_distance_km_sum_l12m", "numeric"),
-    ("gsm_transaction_completed_distance_km_sum_l1m_vs_l3m", "numeric"),
-    ("gsm_transaction_completed_distance_km_sum_l1m_vs_l12m", "numeric"),
-    ("vinfast_transaction_completed_txn_count_l1m", "numeric"),
-    ("vinfast_transaction_completed_txn_count_l3m", "numeric"),
-    ("vinfast_transaction_completed_txn_count_l6m", "numeric"),
-    ("vinfast_transaction_completed_txn_count_l12m", "numeric"),
-    ("vinfast_transaction_completed_txn_count_l1m_vs_l3m", "numeric"),
-    ("vinfast_transaction_completed_txn_count_l1m_vs_l12m", "numeric"),
-    ("vinfast_transaction_completed_gmv_sum_l1m", "numeric"),
-    ("vinfast_transaction_completed_gmv_sum_l3m", "numeric"),
-    ("vinfast_transaction_completed_gmv_sum_l6m", "numeric"),
-    ("vinfast_transaction_completed_gmv_sum_l12m", "numeric"),
-    ("vinfast_transaction_completed_gmv_sum_l1m_vs_l3m", "numeric"),
-    ("vinfast_transaction_completed_gmv_sum_l1m_vs_l12m", "numeric"),
-    ("vinfast_transaction_completed_discount_sum_l1m", "numeric"),
-    ("vinfast_transaction_completed_discount_sum_l3m", "numeric"),
-    ("vinfast_transaction_completed_discount_sum_l6m", "numeric"),
-    ("vinfast_transaction_completed_discount_sum_l12m", "numeric"),
-    ("vinfast_transaction_completed_discount_sum_l1m_vs_l3m", "numeric"),
-    ("vinfast_transaction_completed_discount_sum_l1m_vs_l12m", "numeric"),
-    ("global_loyalty_pnl_gsm_earn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_gsm_earn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_gsm_earn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_gsm_earn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_gsm_earn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_gsm_earn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_gsm_earn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_gsm_earn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_gsm_burn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_gsm_burn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_gsm_burn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_gsm_burn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_gsm_burn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_gsm_burn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_gsm_burn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_gsm_burn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_vinfast_earn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_vinfast_earn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_vinfast_earn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_vinfast_earn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_vinfast_earn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_vinfast_earn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_vinfast_earn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_vinfast_earn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_vinfast_burn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_vinfast_burn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_vinfast_burn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_vinfast_burn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_vinfast_burn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_vinfast_burn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_vinfast_burn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_vinfast_burn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_vinhomes_earn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_vinhomes_earn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_vinhomes_earn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_vinhomes_earn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_vinhomes_earn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_vinhomes_earn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_vinhomes_earn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_vinhomes_earn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_vinhomes_burn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_vinhomes_burn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_vinhomes_burn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_vinhomes_burn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_vinhomes_burn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_vinhomes_burn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_vinhomes_burn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_vinhomes_burn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_vinmec_earn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_vinmec_earn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_vinmec_earn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_vinmec_earn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_vinmec_earn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_vinmec_earn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_vinmec_earn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_vinmec_earn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_vinmec_burn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_vinmec_burn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_vinmec_burn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_vinmec_burn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_vinmec_burn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_vinmec_burn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_vinmec_burn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_vinmec_burn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_vinpearl_earn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_vinpearl_earn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_vinpearl_earn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_vinpearl_earn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_vinpearl_earn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_vinpearl_earn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_vinpearl_earn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_vinpearl_earn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_vinpearl_burn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_vinpearl_burn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_vinpearl_burn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_vinpearl_burn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_vinpearl_burn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_vinpearl_burn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_vinpearl_burn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_vinpearl_burn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_vinschool_earn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_vinschool_earn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_vinschool_earn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_vinschool_earn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_vinschool_earn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_vinschool_earn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_vinschool_earn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_vinschool_earn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_vinschool_burn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_vinschool_burn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_vinschool_burn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_vinschool_burn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_vinschool_burn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_vinschool_burn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_vinschool_burn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_vinschool_burn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_vinclub_earn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_vinclub_earn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_vinclub_earn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_vinclub_earn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_vinclub_earn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_vinclub_earn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_vinclub_earn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_vinclub_earn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_vinclub_burn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_vinclub_burn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_vinclub_burn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_vinclub_burn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_vinclub_burn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_vinclub_burn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_vinclub_burn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_vinclub_burn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_vincomretail_earn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_vincomretail_earn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_vincomretail_earn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_vincomretail_earn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_vincomretail_earn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_vincomretail_earn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_vincomretail_earn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_vincomretail_earn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_vincomretail_burn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_vincomretail_burn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_vincomretail_burn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_vincomretail_burn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_vincomretail_burn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_vincomretail_burn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_vincomretail_burn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_vincomretail_burn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_merchant_earn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_merchant_earn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_merchant_earn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_merchant_earn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_merchant_earn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_merchant_earn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_merchant_earn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_merchant_earn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_merchant_burn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_merchant_burn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_merchant_burn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_merchant_burn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_merchant_burn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_merchant_burn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_merchant_burn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_merchant_burn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_vapp_earn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_vapp_earn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_vapp_earn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_vapp_earn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_vapp_earn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_vapp_earn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_vapp_earn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_vapp_earn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_vapp_burn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_vapp_burn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_vapp_burn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_vapp_burn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_vapp_burn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_vapp_burn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_vapp_burn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_vapp_burn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_fgf_earn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_fgf_earn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_fgf_earn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_fgf_earn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_fgf_earn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_fgf_earn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_fgf_earn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_fgf_earn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_pnl_fgf_burn_completed_pts_sum_l1m", "numeric"),
-    ("global_loyalty_pnl_fgf_burn_completed_pts_sum_l3m", "numeric"),
-    ("global_loyalty_pnl_fgf_burn_completed_pts_sum_l6m", "numeric"),
-    ("global_loyalty_pnl_fgf_burn_completed_pts_sum_l12m", "numeric"),
-    ("global_loyalty_pnl_fgf_burn_completed_txn_count_l1m", "numeric"),
-    ("global_loyalty_pnl_fgf_burn_completed_txn_count_l3m", "numeric"),
-    ("global_loyalty_pnl_fgf_burn_completed_txn_count_l6m", "numeric"),
-    ("global_loyalty_pnl_fgf_burn_completed_txn_count_l12m", "numeric"),
-    ("global_loyalty_primary_earn_pnl_l6m", "categorical"),
-    ("global_loyalty_primary_earn_pnl_l12m", "categorical"),
-    ("global_loyalty_primary_burn_pnl_l6m", "categorical"),
-    ("global_loyalty_primary_burn_pnl_l12m", "categorical"),
-]
+# backend/migrations/versions/0001_...py -> parents[2] = backend/
+_SQL_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "db"
+    / "schema"
+    / "sprint1_feature_store_schema_postgresql.sql"
+)
 
 
-def _feature_sa_type(dtype: str):
-    return sa.Text() if dtype == "categorical" else sa.Float(precision=53)
+def _load_sql() -> str:
+    sql = _SQL_PATH.read_text(encoding="utf-8")
+    # Alembic tự quản lý transaction — bỏ BEGIN;/COMMIT; đứng riêng một dòng.
+    sql = re.sub(r"(?im)^\s*(BEGIN|COMMIT)\s*;\s*$", "", sql)
+    return sql
 
 
 def upgrade() -> None:
-    op.create_table(
-        "customers",
-        sa.Column("customer_id", sa.Integer(), primary_key=True),
-        sa.Column("customer_name", sa.Text()),
-        sa.Column("phone", sa.Text()),
-        sa.Column("email", sa.Text()),
-        sa.Column("segment", sa.Text()),
-        sa.Column("joined_at", sa.Text()),
-    )
-    op.create_table(
-        "gsm_trips",
-        sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("customer_id", sa.Integer(), sa.ForeignKey("customers.customer_id"), nullable=False),
-        sa.Column("service_type", sa.Text()),
-        sa.Column("original_price", sa.Float(precision=53)),
-        sa.Column("discount", sa.Float(precision=53)),
-        sa.Column("distance_km", sa.Float(precision=53)),
-        sa.Column("status", sa.Text()),
-        sa.Column("ts", sa.Text()),
-    )
-    op.create_table(
-        "vinfast_orders",
-        sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("customer_id", sa.Integer(), sa.ForeignKey("customers.customer_id"), nullable=False),
-        sa.Column("item_type", sa.Text()),
-        sa.Column("original_price", sa.Float(precision=53)),
-        sa.Column("discount", sa.Float(precision=53)),
-        sa.Column("status", sa.Text()),
-        sa.Column("processing_hours", sa.Float(precision=53)),
-        sa.Column("ts", sa.Text()),
-    )
-    op.create_table(
-        "loyalty_ledger",
-        sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("customer_id", sa.Integer(), sa.ForeignKey("customers.customer_id"), nullable=False),
-        sa.Column("pnl", sa.Text()),
-        sa.Column("direction", sa.Text()),
-        sa.Column("points", sa.Integer()),
-        sa.Column("status", sa.Text()),
-        sa.Column("ts", sa.Text()),
-    )
-    op.create_index("ix_gsm_trips_customer_id", "gsm_trips", ["customer_id"])
-    op.create_index("ix_vinfast_orders_customer_id", "vinfast_orders", ["customer_id"])
-    op.create_index("ix_loyalty_ledger_customer_id", "loyalty_ledger", ["customer_id"])
-
-    op.create_table(
-        "features",
-        sa.Column(
-            "customer_id",
-            sa.Integer(),
-            sa.ForeignKey("customers.customer_id"),
-            primary_key=True,
-        ),
-        *[sa.Column(name, _feature_sa_type(dtype)) for name, dtype in FEATURE_COLUMNS],
-    )
+    bind = op.get_bind()
+    if bind.dialect.name != "postgresql":
+        raise RuntimeError(
+            "Schema Sprint 1 chỉ hỗ trợ PostgreSQL "
+            f"(đang kết nối: {bind.dialect.name}). Xem README để dựng Postgres."
+        )
+    # psycopg3 không tham số dùng simple query protocol -> cho phép nhiều câu
+    # lệnh (kể cả DO $$ ... $$) trong một lần execute.
+    op.execute(_load_sql())
 
 
 def downgrade() -> None:
-    op.drop_table("features")
-    op.drop_index("ix_loyalty_ledger_customer_id", table_name="loyalty_ledger")
-    op.drop_index("ix_vinfast_orders_customer_id", table_name="vinfast_orders")
-    op.drop_index("ix_gsm_trips_customer_id", table_name="gsm_trips")
-    op.drop_table("loyalty_ledger")
-    op.drop_table("vinfast_orders")
-    op.drop_table("gsm_trips")
-    op.drop_table("customers")
+    op.execute("DROP VIEW IF EXISTS metadata.queryable_feature_view")
+    for schema in ("eval", "agent", "metadata", "feature", "raw"):
+        op.execute(f"DROP SCHEMA IF EXISTS {schema} CASCADE")
+    op.execute("DROP ROLE IF EXISTS feature_agent_reader")
+    op.execute("DROP ROLE IF EXISTS feature_agent_logger")

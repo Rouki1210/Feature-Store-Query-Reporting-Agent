@@ -18,6 +18,7 @@ if str(BACKEND_DIR) not in sys.path:
 
 import streamlit as st
 
+from app.agent.conversation import ask_with_context
 from app.agent.generator import SQLGenerator, SYSTEM_PROMPT
 from app.agent.llm_client import OpenAIJSONClient
 from app.agent.pipeline import AgentPipeline
@@ -179,8 +180,8 @@ def main() -> None:
         with st.chat_message("assistant"):
             with st.spinner("Đang route, generate, validate và execute…"):
                 try:
-                    response = get_pipeline().ask(
-                        question, session_id=st.session_state.session_id
+                    response = ask_with_context(
+                        get_pipeline(), st.session_state.session_id, question
                     )
                     _render_response(response)
                 except Exception as exc:

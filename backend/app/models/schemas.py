@@ -15,6 +15,10 @@ class Confidence(str, Enum):
 
 class AskRequest(BaseModel):
     question: str = Field(..., description="Câu hỏi nghiệp vụ bằng tiếng Việt")
+    session_id: str | None = Field(
+        default=None,
+        description="Gửi lại session_id nhận ở lượt trước để tiếp nối câu hỏi đang chờ làm rõ.",
+    )
 
 
 class RetrievedFeature(BaseModel):
@@ -47,6 +51,9 @@ class CoverageInfo(BaseModel):
 class AskResponse(BaseModel):
     # Khi agent không chắc → trả câu hỏi lại thay vì đoán bừa.
     status: str = Field(default="ok", description="ok | clarify | out_of_scope | error")
+    session_id: str | None = Field(
+        default=None, description="Khóa phiên để client gửi lại ở lượt trả lời tiếp theo."
+    )
     answer_vi: str = Field(default="", description="Diễn giải ngắn bằng tiếng Việt")
     sql: str | None = Field(default=None, description="SQL đã sinh — luôn hiển thị để kiểm chứng")
     result: QueryResult | None = None

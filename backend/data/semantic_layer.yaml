@@ -9267,7 +9267,7 @@ features:
   - vinfast
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_first_completed_updated_date_min_daily
   table: feature.vinfast_transaction
@@ -9718,7 +9718,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_canceled_amount_sum_l1m_vs_l6m
   table: feature.vinfast_transaction
@@ -9749,7 +9749,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_canceled_amount_sum_l1m_vs_l12m
   table: feature.vinfast_transaction
@@ -9780,7 +9780,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_canceled_amount_sum_l3m_vs_l12m
   table: feature.vinfast_transaction
@@ -9811,7 +9811,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_canceled_count_l1m_vs_l3m
   table: feature.vinfast_transaction
@@ -9842,7 +9842,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_canceled_count_l1m_vs_l6m
   table: feature.vinfast_transaction
@@ -9873,7 +9873,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_canceled_count_l1m_vs_l12m
   table: feature.vinfast_transaction
@@ -9904,7 +9904,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_canceled_count_l3m_vs_l12m
   table: feature.vinfast_transaction
@@ -9935,7 +9935,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_canceled_price_sum_l1m_vs_l3m
   table: feature.vinfast_transaction
@@ -9966,7 +9966,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_canceled_price_sum_l1m_vs_l6m
   table: feature.vinfast_transaction
@@ -9997,7 +9997,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_canceled_price_sum_l1m_vs_l12m
   table: feature.vinfast_transaction
@@ -10028,7 +10028,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_canceled_price_sum_l3m_vs_l12m
   table: feature.vinfast_transaction
@@ -10059,7 +10059,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_completed_amount_sum_l1m_vs_l3m
   table: feature.vinfast_transaction
@@ -10092,7 +10092,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_completed_amount_sum_l1m_vs_l6m
   table: feature.vinfast_transaction
@@ -10125,7 +10125,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_completed_amount_sum_l1m_vs_l12m
   table: feature.vinfast_transaction
@@ -10158,7 +10158,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_completed_amount_sum_l3m_vs_l12m
   table: feature.vinfast_transaction
@@ -10191,7 +10191,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_completed_count_l1m_vs_l3m
   table: feature.vinfast_transaction
@@ -10224,7 +10224,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_completed_count_l1m_vs_l6m
   table: feature.vinfast_transaction
@@ -10257,7 +10257,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_completed_count_l1m_vs_l12m
   table: feature.vinfast_transaction
@@ -10290,7 +10290,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_completed_count_l3m_vs_l12m
   table: feature.vinfast_transaction
@@ -10323,7 +10323,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_completed_price_sum_l1m_vs_l3m
   table: feature.vinfast_transaction
@@ -10356,7 +10356,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_completed_price_sum_l1m_vs_l6m
   table: feature.vinfast_transaction
@@ -10389,7 +10389,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_completed_price_sum_l1m_vs_l12m
   table: feature.vinfast_transaction
@@ -10422,7 +10422,7 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true
 - name: txn_wo_completed_price_sum_l3m_vs_l12m
   table: feature.vinfast_transaction
@@ -10455,5 +10455,5 @@ features:
   - 'work_order: không suy diễn thành chủ sở hữu xe.'
   - đơn xe
   support_status: needs_review
-  is_queryable: true
+  is_queryable: false
   is_active: true

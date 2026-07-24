@@ -71,10 +71,14 @@ class AgentPipeline:
         scored = self.semantic_layer.retrieve(
             original, business_unit=route.business_unit
         )
-        if not scored:
-            mark("retriever", "app.semantic.retriever.SemanticLayer", "empty", original, [])
+        # Câu mơ hồ khớp yếu nhiều feature (điểm top thấp) ⇒ hỏi lại thay vì sinh
+        # SQL "gọi tất cả" (mục 5: ambiguous → ask back, đừng đoán).
+        if not scored or scored[0].score < self.settings.retrieval_min_score:
+            reason = "empty" if not scored else "low_confidence"
+            mark("retriever", "app.semantic.retriever.SemanticLayer", reason, original,
+                 [{"name": f.name, "score": f.score} for f in scored[:3]])
             route.intent = IntentType.clarify
-            route.clarifying_question = "Chưa tìm thấy feature phù hợp. Bạn có thể nói rõ BU hoặc chỉ số cần xem không?"
+            route.clarifying_question = "Câu hỏi chưa đủ rõ để chọn đúng chỉ số. Bạn muốn xem chỉ số nào (số chuyến, chi tiêu, tỷ lệ hủy...), của GSM hay VinFast, trong khoảng thời gian nào?"
             self._audit_terminal(original, route, session_id, int((time.perf_counter() - started) * 1000))
             return AskResponse(status="clarify", clarifying_question=route.clarifying_question, pipeline_trace=trace)
         mark("retriever", "app.semantic.retriever.SemanticLayer", "completed", original,

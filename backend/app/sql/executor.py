@@ -15,7 +15,7 @@ from sqlalchemy import text
 from app.config import Settings, get_settings
 from app.db import get_engine
 from app.models.schemas import QueryResult
-from app.sql.guards import GuardError, referenced_tables, validate_sql
+from app.sql.guards import GuardError, has_select_star, referenced_tables, validate_sql
 
 
 def _jsonable(v: Any) -> Any:
@@ -59,7 +59,7 @@ def run_query(
                 VALUES (:id, 'sprint1-v1', :sql, FALSE, :star, :raw, TRUE,
                         CAST(:tables AS jsonb), CAST(:errors AS jsonb), FALSE)
             """), {
-                "id": query_id, "sql": sql, "star": "*" in sql, "raw": "raw." in sql.lower(),
+                "id": query_id, "sql": sql, "star": has_select_star(sql), "raw": "raw." in sql.lower(),
                 "tables": json.dumps(referenced_tables(sql)), "errors": json.dumps([str(exc)]),
             })
         raise

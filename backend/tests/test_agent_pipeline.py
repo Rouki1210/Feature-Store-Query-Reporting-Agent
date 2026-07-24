@@ -56,6 +56,19 @@ def test_pipeline_refusal_does_not_call_llm():
     assert client.calls == []
 
 
+def test_pipeline_clarifies_on_ambiguous_question_without_calling_llm():
+    # Câu mơ hồ (điểm retrieval dưới ngưỡng) → hỏi lại, KHÔNG gọi LLM, không "gọi tất cả".
+    client = StaticJSONClient({
+        "sql": "SELECT customer_id, completed_txn_count_l1m FROM feature.gsm_transaction",
+        "selected_features": ["completed_txn_count_l1m"],
+        "intent": "single_bu",
+    })
+    response = _pipeline(client.payload).ask("cho tôi xem dữ liệu khách hàng")
+    assert response.status == "clarify"
+    assert response.sql is None
+    assert client.calls == []
+
+
 def test_pipeline_rejects_generated_raw_sql():
     client = StaticJSONClient({
         "sql": "SELECT customer_id FROM raw.customers",
@@ -147,6 +160,81 @@ def test_retriever_supports_focused_english_context():
         business_unit="VINFAST",
     )
     assert [item.name for item in results] == ["txn_completed_amount_sum_l12m"]
+
+
+def test_needs_review_features_excluded_from_retrieval():
+    from app.semantic.retriever import SemanticLayer
+
+    layer = SemanticLayer.load("data/semantic_layer.yaml")
+    # NVSO/WO là needs_review → không được lọt vào retrieval surface, kể cả
+    # với câu hỏi chung không nhắc tên (chỉ router mới refuse khi nhắc trực tiếp).
+    assert all("nvso" not in f["name"] and "_wo_" not in f["name"] for f in layer.features)
+    hits = layer.retrieve("VinFast completed transaction amount last 12 months", business_unit="VINFAST")
+    assert all("nvso" not in h.name and "_wo_" not in h.name for h in hits)
+
+
+def test_yaml_is_queryable_matches_support_status():
+    import yaml
+
+    data = yaml.safe_load(open("data/semantic_layer.yaml", encoding="utf-8"))
+    for f in data["features"]:
+        assert f["is_queryable"] == (f["support_status"] == "queryable"), f["name"]
+
+
+def test_mock_canceled_features_are_populated():
+    # Guard bug spelling: feature "canceled" (1 L) phải map raw "cancelled" (2 L),
+    # nếu không mọi canceled_* = 0. Seed cố định nên deterministic.
+    import scripts.generate_mock_data as g
+
+    customers, _dates, trips, orders = g.generate_raw()
+    gsm, vf = g.build_features(customers, trips, orders)
+    assert sum(1 for r in gsm if r.get("canceled_txn_count_l12m")) > 0
+    assert sum(1 for r in vf if r.get("txn_canceled_count_l12m")) > 0
+
+
+def test_mock_multi_snapshot_as_of():
+    # Multi-snapshot: mỗi snapshot chỉ tính sự kiện <= ngày đó (as-of). Nếu quên
+    # pre-filter, days_since sẽ âm (snapshot - sự kiện tương lai). + genuine null.
+    import scripts.generate_mock_data as g
+
+    assert len(g.SNAPSHOTS) >= 2 and g.SNAPSHOTS[-1] == g.SNAPSHOT
+    cs, _d, tr, od = g.generate_raw()
+    gsm, vf = g.build_features(cs, tr, od, g.SNAPSHOTS[0])  # snapshot cũ nhất
+    assert all(r["snapshot_date"] == g.SNAPSHOTS[0] for r in gsm)
+    assert all(v is None or v >= 0 for v in (r.get("days_since_last_txn_l12m") for r in gsm))
+    null_cust = next(r for r in vf if r["customer_id"] == 8)  # cid%8==0 → không có đơn VF
+    assert null_cust.get("completed_order_count_l1m") in (0, None)
+
+
+def test_migration_0002_inventory_matches_feature_spec():
+    # Inventory 353 định nghĩa 2 nơi: feature_spec (→YAML→catalog) và migration
+    # 0002 (→cột vật lý). Migration cố ý đóng băng bản riêng (không import app code
+    # để replay ổn định), nên test này canh hai bản không drift tên/window.
+    import importlib.util
+    import pathlib
+
+    from app.semantic.feature_spec import feature_names
+
+    path = pathlib.Path(__file__).resolve().parents[1] / "migrations" / "versions" / "0002_align_retained_feature_inventory.py"
+    spec = importlib.util.spec_from_file_location("mig0002", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    migration_cols = set(mod._GSM_FEATURES) | set(mod._VINFAST_FEATURES)
+    assert migration_cols == feature_names(), migration_cols ^ feature_names()
+
+
+def test_db_layer_matches_yaml_projection():
+    # Đường runtime (load_from_db) phải chiếu YAML authoritative không lệch field.
+    # Bắt lỗi map cột SQL mà test-YAML và test-pipeline (LLM stub) không thấy.
+    from app.semantic.retriever import SemanticLayer
+
+    yaml_layer = {f["name"]: f for f in SemanticLayer.load("data/semantic_layer.yaml").features}
+    db_features = SemanticLayer.load_from_db().features
+    assert {f["name"] for f in db_features} == set(yaml_layer)  # cùng tập queryable
+    for f in db_features:
+        y = yaml_layer[f["name"]]
+        for k in ("table", "group", "window", "aggregation", "dtype", "unit", "description_en"):
+            assert f[k] == y[k], (f["name"], k, f[k], y[k])
 
 
 def test_validator_rejects_legacy_physical_feature():

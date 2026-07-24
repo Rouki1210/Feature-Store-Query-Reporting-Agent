@@ -43,6 +43,15 @@ class Settings(BaseSettings):
 
     # ---- Retrieval ----
     retrieval_top_k: int = Field(default=8, alias="RETRIEVAL_TOP_K")
+    # Điểm top tối thiểu để coi là "khớp đủ tin cậy". Dưới ngưỡng ⇒ câu hỏi quá
+    # mơ hồ ⇒ hỏi lại (mục 5), không sinh SQL "gọi tất cả". Calib: câu cụ thể ≥2.75,
+    # mơ hồ ≤1.5.
+    retrieval_min_score: float = Field(default=2.0, alias="RETRIEVAL_MIN_SCORE")
+
+    # ---- Conversation (multi-turn clarify) ----
+    # TTL của pending question (short-term state). Hết hạn ⇒ coi câu trả lời ngắn
+    # là câu hỏi mới. Spec đề xuất 10–15 phút.
+    conversation_ttl_seconds: int = Field(default=900, alias="CONVERSATION_TTL_SECONDS")
 
     # ---- App ----
     semantic_layer_path: str = Field(

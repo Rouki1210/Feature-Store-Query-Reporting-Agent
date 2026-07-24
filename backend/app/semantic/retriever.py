@@ -101,6 +101,46 @@ class SemanticLayer:
             data = yaml.safe_load(fh) or {}
         return cls(data.get("features", []))
 
+    @classmethod
+    def load_from_db(cls) -> "SemanticLayer":
+        """Đọc catalog (seed từ YAML authoritative) — nguồn runtime của agent."""
+        from sqlalchemy import text
+
+        from app.db import get_engine
+
+        sql = text("""
+            SELECT fc.feature_name, fc.table_schema, fc.table_name, fc.feature_group,
+                   fc.description_vi, fc.description_en, fc.data_type, fc.aggregation_type,
+                   fc.time_window, fc.unit, fc.null_meaning, fc.sensitivity_level,
+                   fc.is_queryable, fc.is_active,
+                   COALESCE(array_agg(fs.synonym_text)
+                            FILTER (WHERE fs.synonym_text IS NOT NULL), '{}') AS keywords
+            FROM metadata.feature_catalog fc
+            LEFT JOIN metadata.feature_synonyms fs
+              ON fs.feature_id = fc.feature_id AND fs.is_active
+            WHERE fc.table_schema = 'feature' AND fc.is_active AND fc.is_queryable
+            GROUP BY fc.feature_id
+        """)
+        with get_engine().connect() as conn:
+            rows = conn.execute(sql).mappings().all()
+        features = [{
+            "name": r["feature_name"],
+            "table": f'{r["table_schema"]}.{r["table_name"]}',
+            "group": r["feature_group"],
+            "description_vi": r["description_vi"] or "",
+            "description_en": r["description_en"] or "",
+            "dtype": r["data_type"],
+            "aggregation": r["aggregation_type"],
+            "window": r["time_window"],
+            "unit": r["unit"],
+            "null_meaning": r["null_meaning"],
+            "keywords": list(r["keywords"]),
+            "support_status": "needs_review" if r["sensitivity_level"] == "restricted" else "queryable",
+            "is_queryable": r["is_queryable"],
+            "is_active": r["is_active"],
+        } for r in rows]
+        return cls(features)
+
     def __len__(self) -> int:
         return len(self.features)
 
@@ -316,6 +356,6 @@ class SemanticLayer:
 
 @lru_cache
 def get_semantic_layer() -> SemanticLayer:
-    from app.config import get_settings
-
-    return SemanticLayer.load(get_settings().semantic_layer_path)
+    # Agent đọc DB catalog (đã seed từ YAML authoritative). Tests dùng trực tiếp
+    # SemanticLayer.load(yaml_path) khi cần chạy offline không có DB.
+    return SemanticLayer.load_from_db()

@@ -114,6 +114,11 @@ def referenced_tables(sql: str) -> list[str]:
     return [m.group(1).replace('"', "").lower() for m in _TABLE_REF.finditer(sql)]
 
 
+def has_select_star(sql: str) -> bool:
+    """SELECT * / t.* thật (không tính COUNT(*)). Dùng cho audit log."""
+    return bool(_SELECT_STAR.search(sql) or _QUALIFIED_STAR.search(sql))
+
+
 def _check_table_allowlist(sql: str) -> None:
     ctes = {m.group(1).lower() for m in _CTE_NAME.finditer(sql)}
     tables = referenced_tables(sql)

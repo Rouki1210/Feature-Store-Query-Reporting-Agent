@@ -20,7 +20,13 @@ try:
 except ValueError as exc:
     raise ValueError("SNAPSHOT_DATE must use YYYY-MM-DD format") from exc
 UTC = timezone.utc
-CUSTOMER_COUNT = 120
+CUSTOMER_COUNT = 600
+# 6 snapshot cách ~30 ngày (cũ→mới), mới nhất = SNAPSHOT. Cho time-series /
+# window-compare / reporter đêm. ponytail: cách đều 30 ngày thay vì month-end
+# lịch để tránh số học tháng — đủ để test dịch chuyển MoM.
+SNAPSHOTS = tuple(SNAPSHOT - timedelta(days=30 * k) for k in range(5, -1, -1))
+# Sự kiện phải phủ tới l12m của snapshot cũ nhất (SNAPSHOT-150 → cần ~515 ngày).
+EVENT_DAYS_BACK = 550
 
 
 def _timestamp(days_back: int) -> datetime:
@@ -41,7 +47,7 @@ def generate_raw() -> tuple[list[dict], list[dict], list[dict], list[dict]]:
             "is_active": True, "source_system": "mock",
         })
         for _ in range(RNG.randint(3, 55)):
-            start = _timestamp(400)
+            start = _timestamp(EVENT_DAYS_BACK)
             duration = RNG.randint(8, 120)
             fare = RNG.randint(25, 600) * 1000
             discount = RNG.choice([0, 0, 0, RNG.randint(5, 80) * 1000])
@@ -58,9 +64,11 @@ def generate_raw() -> tuple[list[dict], list[dict], list[dict], list[dict]]:
                 "paid_amount": max(fare - discount, 0), "payment_method": RNG.choice(["cash", "card", "wallet"]),
                 "status": status, "created_at": start, "updated_at": start + timedelta(minutes=duration),
             })
-        if cid % 5:
-            for _ in range(RNG.randint(1, 8)):
-                created_at = _timestamp(400)
+        # Giữ ~12% khách KHÔNG có đơn VF (genuine null — CLAUDE.md mục 7) để test
+        # câu hỏi "chưa mua VinFast"; 88% còn lại nhiều đơn để feature VF hết mỏng.
+        if cid % 8:
+            for _ in range(RNG.randint(2, 14)):
+                created_at = _timestamp(EVENT_DAYS_BACK)
                 order_type = RNG.choice(["vehicle", "accessories", "work_order", "nvso"])
                 list_price = (
                     RNG.randint(4000, 15000) * 100_000 if order_type == "vehicle"
@@ -90,16 +98,19 @@ def generate_raw() -> tuple[list[dict], list[dict], list[dict], list[dict]]:
     return customers, dates, trips, orders
 
 
-def _within(ts: datetime, window: str) -> bool:
+def _within(ts: datetime, window: str, snapshot: date) -> bool:
     days = WINDOW_DAYS[window]
-    return SNAPSHOT - timedelta(days=days - 1) <= ts.date() <= SNAPSHOT
+    return snapshot - timedelta(days=days - 1) <= ts.date() <= snapshot
 
 
 def _ratio(a: float, b: float) -> float | None:
     return round(a / b, 4) if b else None
 
 
-def build_features(customers: list[dict], trips: list[dict], orders: list[dict]) -> tuple[list[dict], list[dict]]:
+def build_features(
+    customers: list[dict], trips: list[dict], orders: list[dict],
+    snapshot: date = SNAPSHOT,
+) -> tuple[list[dict], list[dict]]:
     trips_by: dict[int, list[dict]] = defaultdict(list)
     orders_by: dict[int, list[dict]] = defaultdict(list)
     for row in trips:
@@ -110,19 +121,23 @@ def build_features(customers: list[dict], trips: list[dict], orders: list[dict])
     features = all_features()
     for customer in customers:
         cid = customer["customer_id"]
-        tr = trips_by[cid]
-        od = orders_by[cid]
-        gsm: dict[str, Any] = {"customer_id": cid, "snapshot_date": SNAPSHOT}
-        vf: dict[str, Any] = {"customer_id": cid, "snapshot_date": SNAPSHOT}
+        # As-of: chỉ sự kiện <= snapshot (feature tính đúng tại từng mốc thời gian).
+        tr = [r for r in trips_by[cid] if r["trip_start_time"].date() <= snapshot]
+        od = [r for r in orders_by[cid] if r["created_at"].date() <= snapshot]
+        gsm: dict[str, Any] = {"customer_id": cid, "snapshot_date": snapshot}
+        vf: dict[str, Any] = {"customer_id": cid, "snapshot_date": snapshot}
 
         def window_rows(rows: list[dict], window: str, ts_key: str) -> list[dict]:
             if "_vs_" in window:
                 window = window.split("_vs_", 1)[0]
-            return [r for r in rows if window in WINDOW_DAYS and _within(r[ts_key], window)]
+            return [r for r in rows if window in WINDOW_DAYS and _within(r[ts_key], window, snapshot)]
 
         def gsm_metric(stem: str, window: str) -> Any:
             rows = window_rows(tr, window, "trip_start_time")
-            status = "canceled" if stem.startswith("canceled_") else (
+            # Tên feature dùng "canceled" (1 L, theo workbook) nhưng raw status là
+            # "cancelled" (2 L, theo CHECK constraint schema) — phải map, nếu không
+            # mọi feature canceled_* = 0. "finished" không có trong raw → coi = completed (mock).
+            status = "cancelled" if stem.startswith("canceled_") else (
                 "completed" if stem.startswith("completed_") else (
                     "completed" if stem.startswith("finished_") else None
                 )
@@ -138,10 +153,10 @@ def build_features(customers: list[dict], trips: list[dict], orders: list[dict])
                 rows = [r for r in rows if r["service_type"] == service]
             if "days_since_first_txn" in stem:
                 dates = [r["trip_start_time"].date() for r in tr]
-                return (SNAPSHOT - min(dates)).days if dates else None
+                return (snapshot - min(dates)).days if dates else None
             if "days_since_last_txn" in stem:
                 dates = [r["trip_start_time"].date() for r in tr]
-                return (SNAPSHOT - max(dates)).days if dates else None
+                return (snapshot - max(dates)).days if dates else None
             if stem.endswith("_active_day_count"):
                 return len({r["trip_start_time"].date() for r in rows})
             if stem.endswith("_txn_count"):
@@ -161,7 +176,8 @@ def build_features(customers: list[dict], trips: list[dict], orders: list[dict])
             status = None
             for candidate in ("canceled", "completed", "delivered"):
                 if f"_{candidate}_" in stem:
-                    status = candidate
+                    # feature "canceled" (1 L) ↔ raw "cancelled" (2 L) — xem note ở gsm_metric.
+                    status = "cancelled" if candidate == "canceled" else candidate
                     break
             if status:
                 rows = [r for r in rows if r["status"] == status]
@@ -173,10 +189,10 @@ def build_features(customers: list[dict], trips: list[dict], orders: list[dict])
                 rows = [r for r in rows if r["order_type"] == "nvso"]
             if "days_since_first_completed_txn_days" in stem:
                 dates = [r["updated_at"].date() for r in od if r["status"] == "completed"]
-                return (SNAPSHOT - min(dates)).days if dates else None
+                return (snapshot - min(dates)).days if dates else None
             if "days_since_last_completed_txn_days" in stem:
                 dates = [r["updated_at"].date() for r in od if r["status"] == "completed"]
-                return (SNAPSHOT - max(dates)).days if dates else None
+                return (snapshot - max(dates)).days if dates else None
             if stem.startswith("txn_first_completed_updated_date_min"):
                 return min((r["updated_at"].date() for r in rows), default=None)
             if stem.startswith("txn_last_completed_updated_date_max"):
@@ -226,7 +242,11 @@ def _insert(conn, table: str, rows: list[dict]) -> None:
 
 def seed() -> dict[str, int]:
     customers, dates, trips, orders = generate_raw()
-    gsm, vf = build_features(customers, trips, orders)
+    gsm, vf = [], []
+    for snap in SNAPSHOTS:  # 1 dòng feature / khách / snapshot (PK = customer_id + snapshot_date)
+        g_rows, v_rows = build_features(customers, trips, orders, snap)
+        gsm += g_rows
+        vf += v_rows
     engine = get_engine()
     with engine.begin() as conn:
         for table in ("feature.vinfast_transaction", "feature.gsm_transaction", "raw.vinfast_orders",
@@ -240,8 +260,9 @@ def seed() -> dict[str, int]:
         _insert(conn, "feature.vinfast_transaction", vf)
     feature_count, synonym_count = seed_metadata()
     return {
-        "customers": len(customers), "dates": len(dates), "trips": len(trips),
-        "orders": len(orders), "gsm_snapshots": len(gsm), "vinfast_snapshots": len(vf),
+        "customers": len(customers), "snapshots": len(SNAPSHOTS), "dates": len(dates),
+        "trips": len(trips), "orders": len(orders),
+        "gsm_rows": len(gsm), "vinfast_rows": len(vf),
         "catalog": feature_count, "synonyms": synonym_count,
     }
 

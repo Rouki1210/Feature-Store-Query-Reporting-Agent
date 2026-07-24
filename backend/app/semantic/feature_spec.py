@@ -35,12 +35,9 @@ WINDOW_DAYS = {
     "daily": 1,
     "l1w": 7,
     "l2w": 14,
-    "l4w": 28,
     "l1m": 30,
-    "l2m": 60,
     "l3m": 90,
     "l6m": 180,
-    "l8w": 56,
     "l12m": 365,
 }
 
@@ -136,7 +133,7 @@ _VF_STEMS: dict[str, tuple[str, ...]] = {
 }
 
 
-def _group(stem: str, table: str, agg: str) -> str:
+def _group(stem: str, agg: str) -> str:
     if agg == "ratio":
         return "Tỷ lệ & xu hướng"
     if any(x in stem for x in ("date", "days_since", "active_day", "weekday", "daytime", "processing_time")):
@@ -201,7 +198,7 @@ def _build(table: str, stems: dict[str, tuple[str, ...]]) -> list[Feature]:
                 Feature(
                     name=f"{stem}_{window}",
                     table=table,
-                    group=_group(stem, table, agg),
+                    group=_group(stem, agg),
                     dtype=dtype,
                     metric=stem,
                     window=window,

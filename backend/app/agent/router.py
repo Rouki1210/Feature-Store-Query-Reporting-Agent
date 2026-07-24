@@ -58,7 +58,7 @@ class RuleRouter:
             )
 
         gsm = bool(re.search(r"\b(gsm|xanh sm|taxi|gọi xe|chuyến)\b", q))
-        vf = bool(re.search(r"\b(vinfast|xe điện|phụ kiện|đơn xe)\b", q))
+        vf = bool(re.search(r"\b(vinfast|vf|xe điện|phụ kiện|đơn xe)\b", q))
         if gsm and vf:
             return original, RouteDecision(
                 intent=IntentType.clarify, confidence=0.82,

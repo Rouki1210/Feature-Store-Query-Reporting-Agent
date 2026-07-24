@@ -31,6 +31,7 @@ def build() -> dict:
     features = []
     for feat in all_features():
         desc_vi, desc_en, keywords = describe(feat)
+        status = _support_status(feat.name)
         features.append({
             "name": feat.name,
             "table": feat.table,
@@ -44,8 +45,10 @@ def build() -> dict:
             "description_vi": desc_vi,
             "description_en": desc_en,
             "keywords": keywords,   # gộp cả VI lẫn EN
-            "support_status": _support_status(feat.name),
-            "is_queryable": True,
+            "support_status": status,
+            # needs_review (NVSO/WO) bị loại khỏi retrieval — khớp policy DB seed.
+            # Retriever __init__ đã lọc is_queryable, nên chỉ cần set đúng ở đây.
+            "is_queryable": status == "queryable",
             "is_active": True,
         })
     return {

@@ -8,15 +8,16 @@ from __future__ import annotations
 import uuid
 from functools import lru_cache
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.agent.conversation import ask_with_context
 from app.agent.generator import SQLGenerator
 from app.agent.llm_client import OpenAIJSONClient
 from app.agent.pipeline import AgentPipeline
 from app.config import get_settings
-from app.db import dialect_name
+from app.db import dialect_name, get_engine
 from app.models.schemas import AskRequest, AskResponse, FeatureSummary, HealthResponse
 from app.semantic.retriever import get_semantic_layer
 
@@ -37,14 +38,22 @@ def _pipeline() -> AgentPipeline:
 
 
 @app.get("/health", response_model=HealthResponse)
-def health() -> HealthResponse:
+def health(response: Response) -> HealthResponse:
+    # Query catalog TRỰC TIẾP (không qua get_semantic_layer đã cache) để phản ánh
+    # trạng thái DB thật: catalog rỗng ⇒ agent thấy 0 feature ⇒ 503 degraded.
     settings = get_settings()
     try:
+        with get_engine().connect() as conn:
+            conn.execute(text("SELECT 1"))
+            features = conn.execute(
+                text("SELECT count(*) FROM metadata.feature_catalog WHERE is_queryable")
+            ).scalar_one()
         dialect = dialect_name()
-        features = len(get_semantic_layer())
-        status = "ok"
+        status = "ok" if features else "degraded"
     except Exception:
         dialect, features, status = "unavailable", 0, "db_unavailable"
+    if status != "ok":
+        response.status_code = 503
     return HealthResponse(
         status=status, dialect=dialect, features_loaded=features,
         llm_configured=bool(settings.llm_api_key),

@@ -62,6 +62,9 @@ class AskResponse(BaseModel):
     coverage: CoverageInfo | None = None
     repairs: int = Field(default=0, description="Số lần tự sửa SQL đã dùng")
     clarifying_question: str | None = None
+    refusal_code: str | None = Field(
+        default=None, description="Mã từ chối khi out_of_scope/clarify (cho eval guardrail)."
+    )
     error: str | None = None
     pipeline_trace: list[dict[str, Any]] = Field(
         default_factory=list,

@@ -111,8 +111,7 @@ class SemanticLayer:
         sql = text("""
             SELECT fc.feature_name, fc.table_schema, fc.table_name, fc.feature_group,
                    fc.description_vi, fc.description_en, fc.data_type, fc.aggregation_type,
-                   fc.time_window, fc.unit, fc.null_meaning, fc.sensitivity_level,
-                   fc.is_queryable, fc.is_active,
+                   fc.time_window, fc.unit, fc.null_meaning,
                    COALESCE(array_agg(fs.synonym_text)
                             FILTER (WHERE fs.synonym_text IS NOT NULL), '{}') AS keywords
             FROM metadata.feature_catalog fc
@@ -135,9 +134,7 @@ class SemanticLayer:
             "unit": r["unit"],
             "null_meaning": r["null_meaning"],
             "keywords": list(r["keywords"]),
-            "support_status": "needs_review" if r["sensitivity_level"] == "restricted" else "queryable",
-            "is_queryable": r["is_queryable"],
-            "is_active": r["is_active"],
+            "support_status": "queryable",  # WHERE is_queryable đã loại NVSO/WO
         } for r in rows]
         return cls(features)
 

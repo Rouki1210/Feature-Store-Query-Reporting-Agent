@@ -23,6 +23,7 @@ class RefusalCode(str, Enum):
     raw_or_pii = "raw_or_pii"
     out_of_catalog = "out_of_catalog"
     needs_review = "needs_review"
+    irrelevant = "irrelevant" 
 
 
 class RouteDecision(BaseModel):

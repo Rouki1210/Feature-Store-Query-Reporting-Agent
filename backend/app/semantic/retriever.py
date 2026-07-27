@@ -225,6 +225,7 @@ class SemanticLayer:
                 "value", "price", "gia",
             ),
         )
+        discount_requested = _has_term(q_norm, ("discount", "chiet khau", "giam gia"))
         count_requested = not value_requested and _has_term(
             q_norm,
             (
@@ -273,9 +274,9 @@ class SemanticLayer:
                 x in name for x in ("completed", "finished")
             ):
                 continue
-            if _has_term(q_norm, ("discount", "chiet khau")) and "discount" not in name:
+            if discount_requested and "discount" not in name:
                 continue
-            if value_requested and not _has_term(q_norm, ("discount", "chiet khau")):
+            if value_requested and not discount_requested:
                 if "discount" in name:
                     continue
             if _has_term(q_norm, ("distance", "quang duong", "km")) and "distance" not in name:
@@ -344,11 +345,7 @@ class SemanticLayer:
         scored.sort(key=lambda item: (-item.score, item.name))
         if not scored:
             return []
-        # Avoid flooding the generator with semantically adjacent features.
-        # Preserve ties around the best match, but discard the long weak tail.
-        cutoff = scored[0].score - 1.25
-        focused = [item for item in scored if item.score >= cutoff]
-        return focused[: max(1, top_k)]
+        return scored[: max(1, top_k)]
 
 
 @lru_cache

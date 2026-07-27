@@ -417,7 +417,9 @@ features:
   - delivery
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -446,7 +448,9 @@ features:
   - delivery
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -475,7 +479,9 @@ features:
   - delivery
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -504,7 +510,9 @@ features:
   - delivery
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -533,7 +541,9 @@ features:
   - delivery
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -562,7 +572,9 @@ features:
   - delivery
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -591,7 +603,9 @@ features:
   - delivery
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -1145,15 +1159,19 @@ features:
   description_en: 'GSM: Completed Discount Amount Sum over the daily. Completed/finished describes transaction status only.
     NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - chuyến
   - completed chiết khấu giá trị tiền sum
   - completed discount amount sum
   - completed discount amount sum daily
   - completed_discount_amount_sum_daily
   - delivery
+  - giao dich giam gia
+  - giao dich hoan thanh duoc ap dung giam gia
   - giao hàng
   - giá trị & số dư
   - gsm
+  - hoan thanh duoc ap dung giam gia
   - ride
   - trip
   - xanh sm
@@ -1174,15 +1192,19 @@ features:
   description_en: 'GSM: Completed Discount Amount Sum over the last 1 week. Completed/finished describes transaction status
     only. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - chuyến
   - completed chiết khấu giá trị tiền sum
   - completed discount amount sum
   - completed discount amount sum l1w
   - completed_discount_amount_sum_l1w
   - delivery
+  - giao dich giam gia
+  - giao dich hoan thanh duoc ap dung giam gia
   - giao hàng
   - giá trị & số dư
   - gsm
+  - hoan thanh duoc ap dung giam gia
   - ride
   - trip
   - xanh sm
@@ -1203,15 +1225,19 @@ features:
   description_en: 'GSM: Completed Discount Amount Sum over the last 2 weeks. Completed/finished describes transaction status
     only. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - chuyến
   - completed chiết khấu giá trị tiền sum
   - completed discount amount sum
   - completed discount amount sum l2w
   - completed_discount_amount_sum_l2w
   - delivery
+  - giao dich giam gia
+  - giao dich hoan thanh duoc ap dung giam gia
   - giao hàng
   - giá trị & số dư
   - gsm
+  - hoan thanh duoc ap dung giam gia
   - ride
   - trip
   - xanh sm
@@ -1232,15 +1258,19 @@ features:
   description_en: 'GSM: Completed Discount Amount Sum over the last 1 month. Completed/finished describes transaction status
     only. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - chuyến
   - completed chiết khấu giá trị tiền sum
   - completed discount amount sum
   - completed discount amount sum l1m
   - completed_discount_amount_sum_l1m
   - delivery
+  - giao dich giam gia
+  - giao dich hoan thanh duoc ap dung giam gia
   - giao hàng
   - giá trị & số dư
   - gsm
+  - hoan thanh duoc ap dung giam gia
   - ride
   - trip
   - xanh sm
@@ -1261,15 +1291,19 @@ features:
   description_en: 'GSM: Completed Discount Amount Sum over the last 3 months. Completed/finished describes transaction status
     only. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - chuyến
   - completed chiết khấu giá trị tiền sum
   - completed discount amount sum
   - completed discount amount sum l3m
   - completed_discount_amount_sum_l3m
   - delivery
+  - giao dich giam gia
+  - giao dich hoan thanh duoc ap dung giam gia
   - giao hàng
   - giá trị & số dư
   - gsm
+  - hoan thanh duoc ap dung giam gia
   - ride
   - trip
   - xanh sm
@@ -1290,15 +1324,19 @@ features:
   description_en: 'GSM: Completed Discount Amount Sum over the last 6 months. Completed/finished describes transaction status
     only. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - chuyến
   - completed chiết khấu giá trị tiền sum
   - completed discount amount sum
   - completed discount amount sum l6m
   - completed_discount_amount_sum_l6m
   - delivery
+  - giao dich giam gia
+  - giao dich hoan thanh duoc ap dung giam gia
   - giao hàng
   - giá trị & số dư
   - gsm
+  - hoan thanh duoc ap dung giam gia
   - ride
   - trip
   - xanh sm
@@ -1319,15 +1357,19 @@ features:
   description_en: 'GSM: Completed Discount Amount Sum over the last 12 months. Completed/finished describes transaction status
     only. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - chuyến
   - completed chiết khấu giá trị tiền sum
   - completed discount amount sum
   - completed discount amount sum l12m
   - completed_discount_amount_sum_l12m
   - delivery
+  - giao dich giam gia
+  - giao dich hoan thanh duoc ap dung giam gia
   - giao hàng
   - giá trị & số dư
   - gsm
+  - hoan thanh duoc ap dung giam gia
   - ride
   - trip
   - xanh sm
@@ -2150,7 +2192,9 @@ features:
   - delivery
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -2180,7 +2224,9 @@ features:
   - delivery
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -2210,7 +2256,9 @@ features:
   - delivery
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -2240,7 +2288,9 @@ features:
   - delivery
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -2270,7 +2320,9 @@ features:
   - delivery
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -2300,7 +2352,9 @@ features:
   - delivery
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -2330,7 +2384,9 @@ features:
   - delivery
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -2913,6 +2969,7 @@ features:
   description_vi: 'GSM: days since first giao dịch trong 12 tháng gần nhất. NULL khi không có sự kiện trong cửa sổ.'
   description_en: 'GSM: days since first transaction over the last 12 months. NULL when no event exists in the window.'
   keywords:
+  - bat dau su dung
   - chuyến
   - days since first giao dịch
   - days since first transaction
@@ -2920,8 +2977,10 @@ features:
   - days since first txn l12m
   - days_since_first_txn_l12m
   - delivery
+  - giao dich dau tien
   - giao hàng
   - gsm
+  - lan dau
   - ride
   - thời gian & gắn kết
   - trip
@@ -2941,6 +3000,7 @@ features:
   description_vi: 'GSM: days since last giao dịch trong 12 tháng gần nhất. NULL khi không có sự kiện trong cửa sổ.'
   description_en: 'GSM: days since last transaction over the last 12 months. NULL when no event exists in the window.'
   keywords:
+  - chua quay lai
   - chuyến
   - days since last giao dịch
   - days since last transaction
@@ -2950,6 +3010,8 @@ features:
   - delivery
   - giao hàng
   - gsm
+  - lan cuoi
+  - lau khong su dung
   - ride
   - thời gian & gắn kết
   - trip
@@ -3799,7 +3861,9 @@ features:
   - finished_txn_active_day_count_daily
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -3829,7 +3893,9 @@ features:
   - finished_txn_active_day_count_l1w
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -3859,7 +3925,9 @@ features:
   - finished_txn_active_day_count_l2w
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -3889,7 +3957,9 @@ features:
   - finished_txn_active_day_count_l1m
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -3919,7 +3989,9 @@ features:
   - finished_txn_active_day_count_l3m
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -3949,7 +4021,9 @@ features:
   - finished_txn_active_day_count_l6m
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -3979,7 +4053,9 @@ features:
   - finished_txn_active_day_count_l12m
   - giao hàng
   - gsm
+  - hoat dong thuong xuyen
   - ride
+  - so ngay hoat dong
   - thời gian & gắn kết
   - trip
   - xanh sm
@@ -4894,13 +4970,16 @@ features:
   description_en: 'VinFast: days since first completed transaction days over the daily. Completed/finished describes transaction
     status only. NULL when no event exists in the window.'
   keywords:
+  - bat dau su dung
   - car
   - days since first completed giao dịch days
   - days since first completed transaction days
   - days since first completed txn days
   - days since first completed txn days daily
   - days_since_first_completed_txn_days_daily
+  - giao dich dau tien
   - giao dịch
+  - lan dau
   - order
   - thời gian & gắn kết
   - vehicle
@@ -4924,13 +5003,16 @@ features:
   description_en: 'VinFast: days since first completed transaction days over the last 1 week. Completed/finished describes
     transaction status only. NULL when no event exists in the window.'
   keywords:
+  - bat dau su dung
   - car
   - days since first completed giao dịch days
   - days since first completed transaction days
   - days since first completed txn days
   - days since first completed txn days l1w
   - days_since_first_completed_txn_days_l1w
+  - giao dich dau tien
   - giao dịch
+  - lan dau
   - order
   - thời gian & gắn kết
   - vehicle
@@ -4954,13 +5036,16 @@ features:
   description_en: 'VinFast: days since first completed transaction days over the last 2 weeks. Completed/finished describes
     transaction status only. NULL when no event exists in the window.'
   keywords:
+  - bat dau su dung
   - car
   - days since first completed giao dịch days
   - days since first completed transaction days
   - days since first completed txn days
   - days since first completed txn days l2w
   - days_since_first_completed_txn_days_l2w
+  - giao dich dau tien
   - giao dịch
+  - lan dau
   - order
   - thời gian & gắn kết
   - vehicle
@@ -4984,13 +5069,16 @@ features:
   description_en: 'VinFast: days since first completed transaction days over the last 1 month. Completed/finished describes
     transaction status only. NULL when no event exists in the window.'
   keywords:
+  - bat dau su dung
   - car
   - days since first completed giao dịch days
   - days since first completed transaction days
   - days since first completed txn days
   - days since first completed txn days l1m
   - days_since_first_completed_txn_days_l1m
+  - giao dich dau tien
   - giao dịch
+  - lan dau
   - order
   - thời gian & gắn kết
   - vehicle
@@ -5014,13 +5102,16 @@ features:
   description_en: 'VinFast: days since first completed transaction days over the last 3 months. Completed/finished describes
     transaction status only. NULL when no event exists in the window.'
   keywords:
+  - bat dau su dung
   - car
   - days since first completed giao dịch days
   - days since first completed transaction days
   - days since first completed txn days
   - days since first completed txn days l3m
   - days_since_first_completed_txn_days_l3m
+  - giao dich dau tien
   - giao dịch
+  - lan dau
   - order
   - thời gian & gắn kết
   - vehicle
@@ -5044,13 +5135,16 @@ features:
   description_en: 'VinFast: days since first completed transaction days over the last 6 months. Completed/finished describes
     transaction status only. NULL when no event exists in the window.'
   keywords:
+  - bat dau su dung
   - car
   - days since first completed giao dịch days
   - days since first completed transaction days
   - days since first completed txn days
   - days since first completed txn days l6m
   - days_since_first_completed_txn_days_l6m
+  - giao dich dau tien
   - giao dịch
+  - lan dau
   - order
   - thời gian & gắn kết
   - vehicle
@@ -5074,13 +5168,16 @@ features:
   description_en: 'VinFast: days since first completed transaction days over the last 12 months. Completed/finished describes
     transaction status only. NULL when no event exists in the window.'
   keywords:
+  - bat dau su dung
   - car
   - days since first completed giao dịch days
   - days since first completed transaction days
   - days since first completed txn days
   - days since first completed txn days l12m
   - days_since_first_completed_txn_days_l12m
+  - giao dich dau tien
   - giao dịch
+  - lan dau
   - order
   - thời gian & gắn kết
   - vehicle
@@ -5105,12 +5202,15 @@ features:
     status only. NULL when no event exists in the window.'
   keywords:
   - car
+  - chua quay lai
   - days since last completed giao dịch days
   - days since last completed transaction days
   - days since last completed txn days
   - days since last completed txn days daily
   - days_since_last_completed_txn_days_daily
   - giao dịch
+  - lan cuoi
+  - lau khong su dung
   - order
   - thời gian & gắn kết
   - vehicle
@@ -5135,12 +5235,15 @@ features:
     transaction status only. NULL when no event exists in the window.'
   keywords:
   - car
+  - chua quay lai
   - days since last completed giao dịch days
   - days since last completed transaction days
   - days since last completed txn days
   - days since last completed txn days l1w
   - days_since_last_completed_txn_days_l1w
   - giao dịch
+  - lan cuoi
+  - lau khong su dung
   - order
   - thời gian & gắn kết
   - vehicle
@@ -5165,12 +5268,15 @@ features:
     transaction status only. NULL when no event exists in the window.'
   keywords:
   - car
+  - chua quay lai
   - days since last completed giao dịch days
   - days since last completed transaction days
   - days since last completed txn days
   - days since last completed txn days l2w
   - days_since_last_completed_txn_days_l2w
   - giao dịch
+  - lan cuoi
+  - lau khong su dung
   - order
   - thời gian & gắn kết
   - vehicle
@@ -5195,12 +5301,15 @@ features:
     transaction status only. NULL when no event exists in the window.'
   keywords:
   - car
+  - chua quay lai
   - days since last completed giao dịch days
   - days since last completed transaction days
   - days since last completed txn days
   - days since last completed txn days l1m
   - days_since_last_completed_txn_days_l1m
   - giao dịch
+  - lan cuoi
+  - lau khong su dung
   - order
   - thời gian & gắn kết
   - vehicle
@@ -5225,12 +5334,15 @@ features:
     transaction status only. NULL when no event exists in the window.'
   keywords:
   - car
+  - chua quay lai
   - days since last completed giao dịch days
   - days since last completed transaction days
   - days since last completed txn days
   - days since last completed txn days l3m
   - days_since_last_completed_txn_days_l3m
   - giao dịch
+  - lan cuoi
+  - lau khong su dung
   - order
   - thời gian & gắn kết
   - vehicle
@@ -5255,12 +5367,15 @@ features:
     transaction status only. NULL when no event exists in the window.'
   keywords:
   - car
+  - chua quay lai
   - days since last completed giao dịch days
   - days since last completed transaction days
   - days since last completed txn days
   - days since last completed txn days l6m
   - days_since_last_completed_txn_days_l6m
   - giao dịch
+  - lan cuoi
+  - lau khong su dung
   - order
   - thời gian & gắn kết
   - vehicle
@@ -5285,12 +5400,15 @@ features:
     transaction status only. NULL when no event exists in the window.'
   keywords:
   - car
+  - chua quay lai
   - days since last completed giao dịch days
   - days since last completed transaction days
   - days since last completed txn days
   - days since last completed txn days l12m
   - days_since_last_completed_txn_days_l12m
   - giao dịch
+  - lan cuoi
+  - lau khong su dung
   - order
   - thời gian & gắn kết
   - vehicle
@@ -6096,7 +6214,9 @@ features:
   - car
   - giao dịch
   - giao dịch canceled số ngày phát sinh
+  - hoat dong thuong xuyen
   - order
+  - so ngay hoat dong
   - thời gian & gắn kết
   - transaction canceled active-day count
   - txn canceled active day count
@@ -6125,7 +6245,9 @@ features:
   - car
   - giao dịch
   - giao dịch canceled số ngày phát sinh
+  - hoat dong thuong xuyen
   - order
+  - so ngay hoat dong
   - thời gian & gắn kết
   - transaction canceled active-day count
   - txn canceled active day count
@@ -6155,7 +6277,9 @@ features:
   - car
   - giao dịch
   - giao dịch canceled số ngày phát sinh
+  - hoat dong thuong xuyen
   - order
+  - so ngay hoat dong
   - thời gian & gắn kết
   - transaction canceled active-day count
   - txn canceled active day count
@@ -6185,7 +6309,9 @@ features:
   - car
   - giao dịch
   - giao dịch canceled số ngày phát sinh
+  - hoat dong thuong xuyen
   - order
+  - so ngay hoat dong
   - thời gian & gắn kết
   - transaction canceled active-day count
   - txn canceled active day count
@@ -6215,7 +6341,9 @@ features:
   - car
   - giao dịch
   - giao dịch canceled số ngày phát sinh
+  - hoat dong thuong xuyen
   - order
+  - so ngay hoat dong
   - thời gian & gắn kết
   - transaction canceled active-day count
   - txn canceled active day count
@@ -6245,7 +6373,9 @@ features:
   - car
   - giao dịch
   - giao dịch canceled số ngày phát sinh
+  - hoat dong thuong xuyen
   - order
+  - so ngay hoat dong
   - thời gian & gắn kết
   - transaction canceled active-day count
   - txn canceled active day count
@@ -6275,7 +6405,9 @@ features:
   - car
   - giao dịch
   - giao dịch canceled số ngày phát sinh
+  - hoat dong thuong xuyen
   - order
+  - so ngay hoat dong
   - thời gian & gắn kết
   - transaction canceled active-day count
   - txn canceled active day count
@@ -7315,7 +7447,9 @@ features:
   - car
   - giao dịch
   - giao dịch completed số ngày phát sinh
+  - hoat dong thuong xuyen
   - order
+  - so ngay hoat dong
   - thời gian & gắn kết
   - transaction completed active-day count
   - txn completed active day count
@@ -7345,7 +7479,9 @@ features:
   - car
   - giao dịch
   - giao dịch completed số ngày phát sinh
+  - hoat dong thuong xuyen
   - order
+  - so ngay hoat dong
   - thời gian & gắn kết
   - transaction completed active-day count
   - txn completed active day count
@@ -7375,7 +7511,9 @@ features:
   - car
   - giao dịch
   - giao dịch completed số ngày phát sinh
+  - hoat dong thuong xuyen
   - order
+  - so ngay hoat dong
   - thời gian & gắn kết
   - transaction completed active-day count
   - txn completed active day count
@@ -7405,7 +7543,9 @@ features:
   - car
   - giao dịch
   - giao dịch completed số ngày phát sinh
+  - hoat dong thuong xuyen
   - order
+  - so ngay hoat dong
   - thời gian & gắn kết
   - transaction completed active-day count
   - txn completed active day count
@@ -7435,7 +7575,9 @@ features:
   - car
   - giao dịch
   - giao dịch completed số ngày phát sinh
+  - hoat dong thuong xuyen
   - order
+  - so ngay hoat dong
   - thời gian & gắn kết
   - transaction completed active-day count
   - txn completed active day count
@@ -7465,7 +7607,9 @@ features:
   - car
   - giao dịch
   - giao dịch completed số ngày phát sinh
+  - hoat dong thuong xuyen
   - order
+  - so ngay hoat dong
   - thời gian & gắn kết
   - transaction completed active-day count
   - txn completed active day count
@@ -7495,7 +7639,9 @@ features:
   - car
   - giao dịch
   - giao dịch completed số ngày phát sinh
+  - hoat dong thuong xuyen
   - order
+  - so ngay hoat dong
   - thời gian & gắn kết
   - transaction completed active-day count
   - txn completed active day count
@@ -8602,10 +8748,14 @@ features:
   description_en: 'VinFast: Transaction Discount Accessories Completed Count over the last 12 months. Completed/finished describes
     transaction status only. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
+  - giao dich hoan thanh duoc ap dung giam gia
   - giao dịch
   - giao dịch chiết khấu phụ kiện completed số lượng
   - giá trị & số dư
+  - hoan thanh duoc ap dung giam gia
   - order
   - transaction discount accessories completed count
   - txn discount accessories completed count
@@ -8631,7 +8781,9 @@ features:
     sổ.'
   description_en: 'VinFast: Transaction Discount Canceled Count over the daily. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
   - giao dịch
   - giao dịch chiết khấu canceled số lượng
   - giá trị & số dư
@@ -8660,7 +8812,9 @@ features:
     cửa sổ.'
   description_en: 'VinFast: Transaction Discount Canceled Count over the last 1 week. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
   - giao dịch
   - giao dịch chiết khấu canceled số lượng
   - giá trị & số dư
@@ -8689,7 +8843,9 @@ features:
     cửa sổ.'
   description_en: 'VinFast: Transaction Discount Canceled Count over the last 2 weeks. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
   - giao dịch
   - giao dịch chiết khấu canceled số lượng
   - giá trị & số dư
@@ -8718,7 +8874,9 @@ features:
     cửa sổ.'
   description_en: 'VinFast: Transaction Discount Canceled Count over the last 1 month. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
   - giao dịch
   - giao dịch chiết khấu canceled số lượng
   - giá trị & số dư
@@ -8747,7 +8905,9 @@ features:
     cửa sổ.'
   description_en: 'VinFast: Transaction Discount Canceled Count over the last 3 months. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
   - giao dịch
   - giao dịch chiết khấu canceled số lượng
   - giá trị & số dư
@@ -8776,7 +8936,9 @@ features:
     cửa sổ.'
   description_en: 'VinFast: Transaction Discount Canceled Count over the last 6 months. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
   - giao dịch
   - giao dịch chiết khấu canceled số lượng
   - giá trị & số dư
@@ -8806,7 +8968,9 @@ features:
   description_en: 'VinFast: Transaction Discount Canceled Count over the last 12 months. NULL when no event exists in the
     window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
   - giao dịch
   - giao dịch chiết khấu canceled số lượng
   - giá trị & số dư
@@ -8836,10 +9000,14 @@ features:
   description_en: 'VinFast: Transaction Discount Completed Count over the daily. Completed/finished describes transaction
     status only. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
+  - giao dich hoan thanh duoc ap dung giam gia
   - giao dịch
   - giao dịch chiết khấu completed số lượng
   - giá trị & số dư
+  - hoan thanh duoc ap dung giam gia
   - order
   - transaction discount completed count
   - txn discount completed count
@@ -8866,10 +9034,14 @@ features:
   description_en: 'VinFast: Transaction Discount Completed Count over the last 1 week. Completed/finished describes transaction
     status only. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
+  - giao dich hoan thanh duoc ap dung giam gia
   - giao dịch
   - giao dịch chiết khấu completed số lượng
   - giá trị & số dư
+  - hoan thanh duoc ap dung giam gia
   - order
   - transaction discount completed count
   - txn discount completed count
@@ -8896,10 +9068,14 @@ features:
   description_en: 'VinFast: Transaction Discount Completed Count over the last 2 weeks. Completed/finished describes transaction
     status only. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
+  - giao dich hoan thanh duoc ap dung giam gia
   - giao dịch
   - giao dịch chiết khấu completed số lượng
   - giá trị & số dư
+  - hoan thanh duoc ap dung giam gia
   - order
   - transaction discount completed count
   - txn discount completed count
@@ -8926,10 +9102,14 @@ features:
   description_en: 'VinFast: Transaction Discount Completed Count over the last 1 month. Completed/finished describes transaction
     status only. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
+  - giao dich hoan thanh duoc ap dung giam gia
   - giao dịch
   - giao dịch chiết khấu completed số lượng
   - giá trị & số dư
+  - hoan thanh duoc ap dung giam gia
   - order
   - transaction discount completed count
   - txn discount completed count
@@ -8956,10 +9136,14 @@ features:
   description_en: 'VinFast: Transaction Discount Completed Count over the last 3 months. Completed/finished describes transaction
     status only. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
+  - giao dich hoan thanh duoc ap dung giam gia
   - giao dịch
   - giao dịch chiết khấu completed số lượng
   - giá trị & số dư
+  - hoan thanh duoc ap dung giam gia
   - order
   - transaction discount completed count
   - txn discount completed count
@@ -8986,10 +9170,14 @@ features:
   description_en: 'VinFast: Transaction Discount Completed Count over the last 6 months. Completed/finished describes transaction
     status only. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
+  - giao dich hoan thanh duoc ap dung giam gia
   - giao dịch
   - giao dịch chiết khấu completed số lượng
   - giá trị & số dư
+  - hoan thanh duoc ap dung giam gia
   - order
   - transaction discount completed count
   - txn discount completed count
@@ -9016,10 +9204,14 @@ features:
   description_en: 'VinFast: Transaction Discount Completed Count over the last 12 months. Completed/finished describes transaction
     status only. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
+  - giao dich hoan thanh duoc ap dung giam gia
   - giao dịch
   - giao dịch chiết khấu completed số lượng
   - giá trị & số dư
+  - hoan thanh duoc ap dung giam gia
   - order
   - transaction discount completed count
   - txn discount completed count
@@ -9045,7 +9237,9 @@ features:
     sổ.'
   description_en: 'VinFast: Transaction Discount Delivered Count over the daily. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
   - giao dịch
   - giao dịch chiết khấu delivered số lượng
   - giá trị & số dư
@@ -9074,7 +9268,9 @@ features:
     cửa sổ.'
   description_en: 'VinFast: Transaction Discount Delivered Count over the last 1 week. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
   - giao dịch
   - giao dịch chiết khấu delivered số lượng
   - giá trị & số dư
@@ -9103,7 +9299,9 @@ features:
     cửa sổ.'
   description_en: 'VinFast: Transaction Discount Delivered Count over the last 2 weeks. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
   - giao dịch
   - giao dịch chiết khấu delivered số lượng
   - giá trị & số dư
@@ -9132,7 +9330,9 @@ features:
     cửa sổ.'
   description_en: 'VinFast: Transaction Discount Delivered Count over the last 1 month. NULL when no event exists in the window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
   - giao dịch
   - giao dịch chiết khấu delivered số lượng
   - giá trị & số dư
@@ -9162,7 +9362,9 @@ features:
   description_en: 'VinFast: Transaction Discount Delivered Count over the last 3 months. NULL when no event exists in the
     window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
   - giao dịch
   - giao dịch chiết khấu delivered số lượng
   - giá trị & số dư
@@ -9192,7 +9394,9 @@ features:
   description_en: 'VinFast: Transaction Discount Delivered Count over the last 6 months. NULL when no event exists in the
     window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
   - giao dịch
   - giao dịch chiết khấu delivered số lượng
   - giá trị & số dư
@@ -9222,7 +9426,9 @@ features:
   description_en: 'VinFast: Transaction Discount Delivered Count over the last 12 months. NULL when no event exists in the
     window.'
   keywords:
+  - ap dung giam gia
   - car
+  - giao dich giam gia
   - giao dịch
   - giao dịch chiết khấu delivered số lượng
   - giá trị & số dư
@@ -9253,10 +9459,14 @@ features:
     verified. Completed/finished describes transaction status only. NULL when no event exists in the window.'
   keywords:
   - 'NVSO: thuật ngữ nghiệp vụ cần xác minh.'
+  - ap dung giam gia
   - car
+  - giao dich giam gia
+  - giao dich hoan thanh duoc ap dung giam gia
   - giao dịch
   - giao dịch chiết khấu nvso completed số lượng
   - giá trị & số dư
+  - hoan thanh duoc ap dung giam gia
   - order
   - transaction discount nvso completed count
   - txn discount nvso completed count

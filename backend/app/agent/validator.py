@@ -31,6 +31,16 @@ LEGACY_FEATURE_COLUMNS = frozenset({
     "days_since_last_order", "is_vinfast_buyer",
 }) - CANONICAL_FEATURES
 
+_PROJECTED_SNAPSHOT_DATE = re.compile(
+    r"\bselect\s+(?:distinct\s+)?(?:[a-z_]\w*\.)?customer_id\s*,\s*"
+    r"(?:[a-z_]\w*\.)?snapshot_date\b",
+    re.IGNORECASE,
+)
+_PROJECTED_CUSTOMER_ID = re.compile(
+    r"\bselect\s+(?:distinct\s+)?(?:[a-z_]\w*\.)?customer_id\b",
+    re.IGNORECASE,
+)
+
 
 class PipelineValidator:
     def validate(
@@ -59,6 +69,10 @@ class PipelineValidator:
             )
 
         tables = referenced_tables(safe_sql)
+        if _PROJECTED_SNAPSHOT_DATE.search(safe_sql):
+            errors.append("snapshot_date is for filtering only; do not project it unless requested.")
+        if _PROJECTED_CUSTOMER_ID.search(safe_sql) and not re.search(r"\border\s+by\b", safe_sql, re.IGNORECASE):
+            errors.append("Per-customer lists must use ORDER BY customer_id unless ranked explicitly.")
         legacy_used = sorted(
             name
             for name in LEGACY_FEATURE_COLUMNS
@@ -68,6 +82,14 @@ class PipelineValidator:
             errors.append(
                 "Legacy physical columns are not queryable: " + ", ".join(legacy_used)
             )
+        referenced_features = {
+            feature
+            for feature in CANONICAL_FEATURES
+            if re.search(rf"\b{re.escape(feature)}\b", safe_sql, re.IGNORECASE)
+        }
+        unselected = sorted(referenced_features - set(generation.selected_features))
+        if unselected:
+            errors.append("SQL uses unselected features: " + ", ".join(unselected))
         for feature in generation.selected_features:
             if not re.search(rf"\b{re.escape(feature)}\b", safe_sql, re.IGNORECASE):
                 errors.append(f"SQL does not use selected feature: {feature}")

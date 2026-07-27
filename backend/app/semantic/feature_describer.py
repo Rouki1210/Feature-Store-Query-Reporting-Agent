@@ -47,6 +47,25 @@ _TERM = {
 }
 
 
+def _business_aliases(stem: str) -> set[str]:
+    """Business phrases that do not follow the physical column naming."""
+    aliases: set[str] = set()
+    if stem.startswith("days_since_last"):
+        aliases.update({"chua quay lai", "lau khong su dung", "lan cuoi"})
+    if stem.startswith("days_since_first"):
+        aliases.update({"bat dau su dung", "giao dich dau tien", "lan dau"})
+    if "active_day_count" in stem:
+        aliases.update({"hoat dong thuong xuyen", "so ngay hoat dong"})
+    if "discount" in stem:
+        aliases.update({"ap dung giam gia", "giao dich giam gia"})
+    if "discount" in stem and "completed" in stem and "count" in stem:
+        aliases.update({
+            "giao dich hoan thanh duoc ap dung giam gia",
+            "hoan thanh duoc ap dung giam gia",
+        })
+    return aliases
+
+
 def _window_text(window: str | None) -> tuple[str, str]:
     if not window:
         return "", ""
@@ -128,5 +147,6 @@ def describe(feat: Feature) -> tuple[str, str, list[str]]:
         keywords.update({"vinfast", "vf", "order", "vehicle", "car", "đơn xe", "giao dịch"})
     if "buyer" in feat.name or "owner" in feat.name:
         keywords.update({"buyer", "owner", "chủ sở hữu", "người mua"})
+    keywords.update(_business_aliases(stem))
     keywords.update(notes)
     return vi, en, sorted(k for k in keywords if k)

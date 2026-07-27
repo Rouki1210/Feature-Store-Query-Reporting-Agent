@@ -32,6 +32,7 @@ class Settings(BaseSettings):
 
     # ---- SQL guards ----
     sql_max_rows: int = Field(default=1000, alias="SQL_MAX_ROWS")
+    sql_default_rows: int = Field(default=100, alias="SQL_DEFAULT_ROWS")
     sql_sensitive_columns: str = Field(
         default="customer_name,phone,phone_number,email,national_id,cccd,address,dob,full_name",
         alias="SQL_SENSITIVE_COLUMNS",
@@ -56,6 +57,9 @@ class Settings(BaseSettings):
     # ---- App ----
     semantic_layer_path: str = Field(
         default="./data/semantic_layer.yaml", alias="SEMANTIC_LAYER_PATH"
+    )
+    golden_set_path: str = Field(
+        default="./data/golden_set.yaml", alias="GOLDEN_SET_PATH"
     )
     cors_origins: str = Field(
         default="http://localhost:5173,http://127.0.0.1:5173", alias="CORS_ORIGINS"

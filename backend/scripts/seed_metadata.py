@@ -70,13 +70,13 @@ def seed() -> tuple[int, int]:
             restricted = f.get("support_status") != "queryable"
             feature_id = conn.execute(UPSERT_FEATURE, {
                 "feature_name": f["name"], "table_schema": schema, "table_name": table,
-                "business_unit": f.get("business_unit") or ("GSM" if table.startswith("gsm") else "VINFAST"),
+                "business_unit": f["business_unit"],
                 "feature_group": f["group"], "description_vi": f["description_vi"],
                 "description_en": f.get("description_en", ""), "data_type": f["dtype"],
                 "aggregation_type": f.get("aggregation"), "time_window": f.get("window"),
                 "null_meaning": f.get("null_meaning"), "unit": f.get("unit"),
                 "sensitivity_level": "restricted" if restricted else "internal",
-                "is_queryable": bool(f.get("is_queryable", not restricted)),
+                "is_queryable": not restricted,
             }).scalar_one()
             conn.execute(text("DELETE FROM metadata.feature_synonyms WHERE feature_id=:id"), {"id": feature_id})
             rows = []

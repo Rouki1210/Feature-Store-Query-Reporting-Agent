@@ -33,12 +33,19 @@ def _hit(q: str, terms: tuple[str, ...]) -> bool:
 
 
 class RuleRouter:
+    _vehicle_handover = ("bàn giao", "handover")
+    _loyalty = ("loyalty", "vinclub")
+    _window = ("daily", "l1w", "l2w", "l1m", "l2m", "l3m", "l6m", "l12m", "hôm nay", "ngày", "tuần", "tháng", "month", "week")
+    _windowed_metric = ("số chuyến", "số đơn", "hoàn thành", "completed", "bị hủy", "canceled", "chi tiêu", "giá trị", "quãng đường", "hoạt động")
     _cross = ("cross pnl", "liên pnl", "chéo ngành", "chuyển dịch giữa", "earn", "burn", "loyalty", "vinclub")
     _owner = ("owner", "ownership", "sở hữu xe", "đứng tên xe", "chủ xe")
     # 'raw' word-boundary phủ cả raw. / raw data / raw table.
     _raw_pii = ("raw", "pii", "số điện thoại", "phone", "email", "cccd", "địa chỉ", "họ tên", "customer name")
     _out_catalog = ("vinhomes", "vinmec", "vinpearl", "vinschool", "vinclub")
     _review = ("nvso", "work order", "work_order", "wo")
+    # Agent read-only: yêu cầu ghi/xóa/DDL, hoặc "trả toàn bộ cột" (SELECT *) → ngoài phạm vi.
+    _unsafe = ("xóa", "xoá", "delete", "drop", "truncate", "insert")
+    _selectall = ("toàn bộ cột", "tất cả các cột", "tất cả cột", "mọi cột", "select *")
     _cmp = ("so sánh", "vs", "versus", "tăng giảm", "kỳ trước")
     _agg = ("theo", "group by", "tổng", "trung bình", "phân bổ", "bao nhiêu")
     _flt = ("lọc", "lớn hơn", "nhỏ hơn", "trên", "dưới", "top")
@@ -58,6 +65,18 @@ class RuleRouter:
 
     def route(self, question: str, max_chars: int = 2000) -> tuple[str, RouteDecision]:
         original, q = normalize_question(question, max_chars)
+        if _hit(q, self._loyalty):
+            return original, RouteDecision(
+                intent=IntentType.out_of_scope, confidence=0.98,
+                reason="Loyalty/VinClub không thuộc catalog Sprint 1.",
+                refusal_code=RefusalCode.out_of_catalog,
+            )
+        if _hit(q, self._vehicle_handover):
+            return original, RouteDecision(
+                intent=IntentType.out_of_scope, confidence=0.99,
+                reason="Không được suy diễn vehicle handover từ dữ liệu giao dịch.",
+                refusal_code=RefusalCode.vehicle_owner,
+            )
         if _hit(q, self._cross):
             return original, RouteDecision(
                 intent=IntentType.out_of_scope, confidence=0.99,
@@ -89,14 +108,20 @@ class RuleRouter:
                 refusal_code=RefusalCode.needs_review,
                 clarifying_question="Bạn muốn dùng thuật ngữ này theo định nghĩa nghiệp vụ nào?",
             )
+        if _hit(q, self._unsafe) or _hit(q, self._selectall):
+            return original, RouteDecision(
+                intent=IntentType.out_of_scope, confidence=0.95,
+                reason="Agent chỉ đọc (read-only): không ghi/xóa dữ liệu và không trả toàn bộ cột (SELECT *).",
+            )
 
         gsm = bool(re.search(r"\b(gsm|xanh sm|taxi|gọi xe|chuyến)\b", q))
         vf = bool(re.search(r"\b(vinfast|vf|xe điện|phụ kiện|đơn xe)\b", q))
         if gsm and vf:
+            # Cross-BU (kết hợp/so sánh GSM và VinFast) ngoài phạm vi Sprint 1.
             return original, RouteDecision(
-                intent=IntentType.clarify, confidence=0.82,
-                reason="Câu hỏi đồng thời nhắc GSM và VinFast; cần chọn một BU.",
-                clarifying_question="Bạn muốn xem riêng GSM hay VinFast?",
+                intent=IntentType.out_of_scope, confidence=0.9,
+                reason="Kết hợp/so sánh GSM và VinFast là cross-BU, ngoài phạm vi Sprint 1.",
+                refusal_code=RefusalCode.cross_pnl,
             )
         bu = "GSM" if gsm else ("VINFAST" if vf else None)
         # Lọc câu lạc đề: không BU và không tín hiệu domain → ngoài phạm vi
@@ -106,6 +131,12 @@ class RuleRouter:
                 intent=IntentType.out_of_scope, confidence=0.7,
                 reason="Câu hỏi ngoài phạm vi dữ liệu feature store Sprint 1 (chỉ GSM/VinFast).",
                 refusal_code=RefusalCode.irrelevant,
+            )
+        if bu and _hit(q, self._windowed_metric) and not _hit(q, self._window):
+            return original, RouteDecision(
+                intent=IntentType.clarify, confidence=0.7,
+                reason="Thiếu time window cho metric dùng feature snapshot.",
+                clarifying_question="Bạn muốn xem trong khoảng 1 tuần, 1 tháng hay 12 tháng?",
             )
         if _hit(q, self._cmp):
             intent = IntentType.window_compare

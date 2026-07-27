@@ -50,12 +50,12 @@ _CTE_NAME = re.compile(r'(?:\bwith|,)\s*"?([A-Za-z_]\w*)"?\s+as\s*\(', re.IGNORE
 ALLOWED_SCHEMAS = frozenset({"feature", "metadata"})
 
 
-def _resolve_settings(settings: Any) -> tuple[list[str], int]:
+def _resolve_settings(settings: Any) -> tuple[list[str], int, int]:
     """Lấy (sensitive_columns, max_rows) từ settings; nạp mặc định nếu None."""
     if settings is None:
         from app.config import get_settings  # import trễ để tránh phụ thuộc pydantic khi test guard
         settings = get_settings()
-    return settings.sensitive_columns, settings.sql_max_rows
+    return settings.sensitive_columns, settings.sql_default_rows, settings.sql_max_rows
 
 
 def _strip_comments(sql: str) -> str:
@@ -138,11 +138,11 @@ def _check_table_allowlist(sql: str) -> None:
             )
 
 
-def _enforce_row_limit(sql: str, max_rows: int) -> str:
+def _enforce_row_limit(sql: str, default_rows: int, max_rows: int) -> str:
     """Áp row-limit cứng: thêm LIMIT nếu thiếu, kẹp nếu vượt."""
     match = _LIMIT_RE.search(sql)
     if match is None:
-        return f"{sql} LIMIT {max_rows}"
+        return f"{sql} LIMIT {min(default_rows, max_rows)}"
     current = int(match.group(1))
     if current > max_rows:
         start, end = match.span(1)
@@ -156,7 +156,7 @@ def validate_sql(sql: str, settings: Any = None) -> str:
     Thứ tự: strip comment → 1 câu lệnh → SELECT/WITH → chặn từ khóa cấm →
     chặn '*' → chặn cột nhạy cảm → áp row-limit.
     """
-    sensitive, max_rows = _resolve_settings(settings)
+    sensitive, default_rows, max_rows = _resolve_settings(settings)
     if not sql or not sql.strip():
         raise GuardError("SQL rỗng.")
 
@@ -172,7 +172,7 @@ def validate_sql(sql: str, settings: Any = None) -> str:
     _check_sensitive_columns(body, sensitive)
     _check_table_allowlist(body)
 
-    return _enforce_row_limit(body, max_rows)
+    return _enforce_row_limit(body, default_rows, max_rows)
 
 
 def is_safe(sql: str, settings: Any = None) -> bool:

@@ -26,6 +26,13 @@ def _jsonable(v: Any) -> Any:
     return v
 
 
+def _prepare_query_connection(conn, settings: Settings) -> None:
+    """Constrain the query transaction; SQLite tests do not support PostgreSQL roles."""
+    if conn.dialect.name == "postgresql":
+        conn.execute(text("SET LOCAL ROLE feature_agent_reader"))
+        conn.execute(text(f"SET LOCAL statement_timeout = {settings.sql_timeout_ms}"))
+
+
 def run_query(
     sql: str,
     settings: Settings | None = None,
@@ -66,6 +73,7 @@ def run_query(
 
     try:
         with engine.connect() as conn:
+            _prepare_query_connection(conn, settings)
             result = conn.execute(text(safe_sql))
             columns = list(result.keys())
             raw_rows = result.fetchall()

@@ -34,7 +34,7 @@ def test_router_refuses_raw_without_llm():
 
 def test_pipeline_runs_valid_feature_query():
     client = StaticJSONClient({
-        "sql": "SELECT customer_id, completed_txn_count_l1m FROM feature.gsm_transaction",
+        "sql": "SELECT customer_id, completed_txn_count_l1m FROM feature.gsm_transaction ORDER BY customer_id",
         "selected_features": ["completed_txn_count_l1m"],
         "intent": "single_bu",
         "confidence": 0.95,
@@ -79,6 +79,17 @@ def test_pipeline_rejects_generated_raw_sql():
     response = _pipeline(client.payload).ask("GSM customers")
     assert response.status == "error"
     assert "raw" in (response.error or "").lower()
+
+
+def test_pipeline_rejects_projected_snapshot_date():
+    client = StaticJSONClient({
+        "sql": "SELECT customer_id, snapshot_date, completed_txn_count_l1m FROM feature.gsm_transaction",
+        "selected_features": ["completed_txn_count_l1m"],
+        "intent": "single_bu",
+    })
+    response = _pipeline(client.payload).ask("GSM sá»‘ chuyáº¿n thĂ¡ng gáº§n nháº¥t")
+    assert response.status == "error"
+    assert "snapshot_date" in (response.error or "")
 
 
 def test_optional_narrator_returns_validated_text():
@@ -160,6 +171,21 @@ def test_retriever_supports_focused_english_context():
         business_unit="VINFAST",
     )
     assert [item.name for item in results] == ["txn_completed_amount_sum_l12m"]
+
+
+def test_retriever_keeps_hard_business_aliases_in_top_five():
+    from app.semantic.retriever import SemanticLayer
+
+    layer = SemanticLayer.load("data/semantic_layer.yaml")
+    cases = {
+        "Top 10 khách GSM lâu nhất chưa quay lại sử dụng dịch vụ trong 12 tháng gần nhất": "days_since_last_txn_l12m",
+        "Top 10 khách bắt đầu sử dụng GSM từ lâu nhất trong 12 tháng gần nhất": "days_since_first_txn_l12m",
+        "Top 10 khách hoạt động thường xuyên nhất trên GSM trong tháng gần nhất": "completed_txn_active_day_count_l1m",
+        "Top 10 khách có nhiều giao dịch VinFast hoàn thành được áp dụng giảm giá nhất trong 12 tháng": "txn_discount_completed_count_l12m",
+        "Liệt kê khách có giao dịch VinFast hoàn thành đầu tiên trong vòng 30 ngày gần nhất": "days_since_first_completed_txn_days_l12m",
+    }
+    for question, expected in cases.items():
+        assert expected in {f.name for f in layer.retrieve(question, top_k=5)}
 
 
 def test_needs_review_features_excluded_from_retrieval():
@@ -251,3 +277,20 @@ def test_validator_rejects_legacy_physical_feature():
     )
     assert not result.valid
     assert any("canonical" in error.lower() or "legacy" in error.lower() for error in result.errors)
+
+
+def test_validator_rejects_feature_not_declared_as_selected():
+    from app.agent.contracts import GenerationResponse, IntentType
+    from app.agent.validator import PipelineValidator
+
+    result = PipelineValidator().validate(
+        GenerationResponse(
+            sql=("SELECT customer_id, completed_txn_count_l1m, finished_txn_count_l1m "
+                 "FROM feature.gsm_transaction ORDER BY customer_id"),
+            selected_features=["completed_txn_count_l1m"],
+            intent=IntentType.single_bu,
+        ),
+        {"completed_txn_count_l1m", "finished_txn_count_l1m"},
+    )
+    assert not result.valid
+    assert any("unselected" in error.lower() for error in result.errors)

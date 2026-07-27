@@ -29,6 +29,15 @@ def test_with_cte_passes():
     assert is_safe(sql, SETTINGS)
 
 
+def test_ast_rejects_write_hidden_in_cte():
+    with pytest.raises(GuardError):
+        validate_sql(
+            "WITH changed AS (DELETE FROM feature.gsm_transaction RETURNING customer_id) "
+            "SELECT customer_id FROM changed",
+            SETTINGS,
+        )
+
+
 def test_count_star_is_allowed():
     # COUNT(*) hợp lệ; chỉ 'SELECT *' mới bị chặn.
     safe = validate_sql("SELECT COUNT(*) AS n FROM feature.gsm_transaction", SETTINGS)
@@ -44,6 +53,12 @@ def test_existing_limit_over_cap_is_clamped():
     safe = validate_sql("SELECT customer_id FROM feature.gsm_transaction LIMIT 999999", SETTINGS)
     assert "LIMIT 100" in safe.upper()
     assert "999999" not in safe
+
+
+def test_missing_limit_uses_default_not_safety_cap():
+    settings = Settings(SQL_DEFAULT_ROWS=100, SQL_MAX_ROWS=1000)
+    safe = validate_sql("SELECT customer_id FROM feature.gsm_transaction", settings)
+    assert "LIMIT 100" in safe.upper()
 
 
 # ---------------- Chặn ghi / DDL ----------------
@@ -117,6 +132,15 @@ def test_raw_schema_and_unqualified_table_rejected():
 
 def test_metadata_schema_allowed():
     assert is_safe("SELECT feature_name FROM metadata.feature_catalog", SETTINGS)
+
+
+def test_cross_bu_join_rejected_by_sql_guard():
+    with pytest.raises(GuardError):
+        validate_sql(
+            "SELECT g.customer_id FROM feature.gsm_transaction g "
+            "JOIN feature.vinfast_transaction v ON v.customer_id = g.customer_id",
+            SETTINGS,
+        )
 
 
 @pytest.mark.parametrize("sql", [

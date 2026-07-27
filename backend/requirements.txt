@@ -13,7 +13,7 @@ psycopg[binary]>=3.2          # driver Postgres (không dùng khi chạy SQLite)
 alembic>=1.14                 # schema migrations (alembic upgrade head)
 
 # --- SQL parsing / guards ---
-sqlparse>=0.5
+sqlglot>=26.0
 
 # --- Semantic layer ---
 PyYAML>=6.0

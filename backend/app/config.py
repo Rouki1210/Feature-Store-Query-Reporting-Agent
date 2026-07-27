@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     # ---- SQL guards ----
     sql_max_rows: int = Field(default=1000, alias="SQL_MAX_ROWS")
     sql_default_rows: int = Field(default=100, alias="SQL_DEFAULT_ROWS")
+    sql_timeout_ms: int = Field(default=5_000, ge=1, alias="SQL_TIMEOUT_MS")
     sql_sensitive_columns: str = Field(
         default="customer_name,phone,phone_number,email,national_id,cccd,address,dob,full_name",
         alias="SQL_SENSITIVE_COLUMNS",

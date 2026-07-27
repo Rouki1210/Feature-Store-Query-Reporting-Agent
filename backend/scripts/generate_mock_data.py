@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import random
 import os
+import re
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
@@ -35,8 +36,11 @@ def _timestamp(days_back: int) -> datetime:
 
 
 def generate_raw() -> tuple[list[dict], list[dict], list[dict], list[dict]]:
+    RNG.seed(20260723)
     customers, trips, orders = [], [], []
     for cid in range(1, CUSTOMER_COUNT + 1):
+        inactive = cid % 20 == 0
+        vinfast_only = cid % 20 == 3
         created = _timestamp(900)
         customers.append({
             "customer_id": cid, "created_at": created, "updated_at": created,
@@ -46,27 +50,28 @@ def generate_raw() -> tuple[list[dict], list[dict], list[dict], list[dict]]:
             "residence_province": RNG.choice(["Hà Nội", "TP Hồ Chí Minh", "Đà Nẵng"]),
             "is_active": True, "source_system": "mock",
         })
-        for _ in range(RNG.randint(3, 55)):
-            start = _timestamp(EVENT_DAYS_BACK)
-            duration = RNG.randint(8, 120)
-            fare = RNG.randint(25, 600) * 1000
-            discount = RNG.choice([0, 0, 0, RNG.randint(5, 80) * 1000])
-            status = RNG.choices(
-                ["completed", "cancelled", "created", "in_progress"],
-                weights=[82, 10, 4, 4],
-            )[0]
-            trips.append({
-                "trip_id": len(trips) + 1, "customer_id": cid,
-                "trip_start_time": start, "trip_end_time": start + timedelta(minutes=duration),
-                "service_type": RNG.choice(["taxi", "bike", "express", "food"]),
-                "distance_km": round(RNG.uniform(1, 45), 2), "duration_min": duration,
-                "total_fare": fare, "discount_amount": min(discount, fare),
-                "paid_amount": max(fare - discount, 0), "payment_method": RNG.choice(["cash", "card", "wallet"]),
-                "status": status, "created_at": start, "updated_at": start + timedelta(minutes=duration),
-            })
+        if not inactive and not vinfast_only:
+            for _ in range(RNG.randint(3, 55)):
+                start = _timestamp(EVENT_DAYS_BACK)
+                duration = RNG.randint(8, 120)
+                fare = RNG.randint(25, 600) * 1000
+                discount = RNG.choice([0, 0, 0, RNG.randint(5, 80) * 1000])
+                status = RNG.choices(
+                    ["completed", "cancelled", "created", "in_progress"],
+                    weights=[82, 10, 4, 4],
+                )[0]
+                trips.append({
+                    "trip_id": len(trips) + 1, "customer_id": cid,
+                    "trip_start_time": start, "trip_end_time": start + timedelta(minutes=duration),
+                    "service_type": RNG.choice(["taxi", "bike", "express", "food"]),
+                    "distance_km": round(RNG.uniform(1, 45), 2), "duration_min": duration,
+                    "total_fare": fare, "discount_amount": min(discount, fare),
+                    "paid_amount": max(fare - discount, 0), "payment_method": RNG.choice(["cash", "card", "wallet"]),
+                    "status": status, "created_at": start, "updated_at": start + timedelta(minutes=duration),
+                })
         # Giữ ~12% khách KHÔNG có đơn VF (genuine null — CLAUDE.md mục 7) để test
         # câu hỏi "chưa mua VinFast"; 88% còn lại nhiều đơn để feature VF hết mỏng.
-        if cid % 8:
+        if not inactive and cid % 8:
             for _ in range(RNG.randint(2, 14)):
                 created_at = _timestamp(EVENT_DAYS_BACK)
                 order_type = RNG.choice(["vehicle", "accessories", "work_order", "nvso"])
@@ -77,7 +82,11 @@ def generate_raw() -> tuple[list[dict], list[dict], list[dict], list[dict]]:
                 paid = int(list_price * RNG.uniform(.88, 1.0))
                 orders.append({
                     "order_id": len(orders) + 1, "customer_id": cid,
-                    "created_at": created_at, "updated_at": created_at + timedelta(days=RNG.randint(0, 10)),
+                    "created_at": created_at,
+                    "updated_at": min(
+                        created_at + timedelta(days=RNG.randint(0, 10)),
+                        datetime.combine(SNAPSHOT, time.max, UTC),
+                    ),
                     "status": RNG.choices(["completed", "delivered", "cancelled", "processing"], [65, 15, 10, 10])[0],
                     "order_type": order_type, "list_price": list_price, "paid_amount": paid,
                     "battery_kwh": round(RNG.uniform(30, 100), 2) if order_type == "vehicle" else None,
@@ -104,7 +113,7 @@ def _within(ts: datetime, window: str, snapshot: date) -> bool:
 
 
 def _ratio(a: float, b: float) -> float | None:
-    return round(a / b, 4) if b else None
+    return round(a / b, 4) if a is not None and b else None
 
 
 def build_features(
@@ -123,7 +132,10 @@ def build_features(
         cid = customer["customer_id"]
         # As-of: chỉ sự kiện <= snapshot (feature tính đúng tại từng mốc thời gian).
         tr = [r for r in trips_by[cid] if r["trip_start_time"].date() <= snapshot]
-        od = [r for r in orders_by[cid] if r["created_at"].date() <= snapshot]
+        od = [
+            r for r in orders_by[cid]
+            if r["created_at"].date() <= snapshot and r["updated_at"].date() <= snapshot
+        ]
         gsm: dict[str, Any] = {"customer_id": cid, "snapshot_date": snapshot}
         vf: dict[str, Any] = {"customer_id": cid, "snapshot_date": snapshot}
 
@@ -231,6 +243,45 @@ def build_features(
     return gsm_rows, vf_rows
 
 
+def data_quality_errors(
+    customers: list[dict], trips: list[dict], orders: list[dict],
+    gsm_rows: list[dict], vf_rows: list[dict],
+) -> list[str]:
+    """Small deterministic gate for the mock-store invariants used in Sprint 1."""
+    errors: list[str] = []
+    trip_customers = {row["customer_id"] for row in trips}
+    order_customers = {row["customer_id"] for row in orders}
+    groups = {
+        (cid in trip_customers, cid in order_customers)
+        for cid in (customer["customer_id"] for customer in customers)
+    }
+    if groups != {(False, False), (False, True), (True, False), (True, True)}:
+        errors.append("missing customer activity group")
+
+    for row in gsm_rows + vf_rows:
+        for name, value in row.items():
+            if name.endswith("_l1m") and any(token in name for token in ("_count_", "_sum_", "_max_")):
+                prefix = name.removesuffix("l1m")
+                wider = [row.get(prefix + window) for window in ("l3m", "l12m")]
+                if value is not None and any(other is not None and value > other for other in wider):
+                    errors.append(f"window invariant failed: {name}")
+            match = re.match(r"(.+)_(l\d+[wm])_vs_(l\d+[wm])$", name)
+            if match and value is not None:
+                base, left, right = match.groups()
+                left_name, right_name = f"{base}_{left}", f"{base}_{right}"
+                if left_name in row and right_name in row:
+                    expected = _ratio(row[left_name], row[right_name])
+                    if expected != value:
+                        errors.append(f"ratio invariant failed: {name}")
+            if "days_since" in name and value is not None and value < 0:
+                errors.append(f"negative recency: {name}")
+        first = [value for name, value in row.items() if "first_completed_updated_date" in name and value]
+        last = [value for name, value in row.items() if "last_completed_updated_date" in name and value]
+        if first and last and min(first) > max(last):
+            errors.append("first completed date after last completed date")
+    return errors
+
+
 def _insert(conn, table: str, rows: list[dict]) -> None:
     if not rows:
         return
@@ -247,6 +298,9 @@ def seed() -> dict[str, int]:
         g_rows, v_rows = build_features(customers, trips, orders, snap)
         gsm += g_rows
         vf += v_rows
+    errors = data_quality_errors(customers, trips, orders, gsm, vf)
+    if errors:
+        raise RuntimeError("Mock data quality failed: " + "; ".join(sorted(set(errors))[:5]))
     engine = get_engine()
     with engine.begin() as conn:
         for table in ("feature.vinfast_transaction", "feature.gsm_transaction", "raw.vinfast_orders",

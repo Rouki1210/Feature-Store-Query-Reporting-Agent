@@ -82,7 +82,7 @@ Xem "Chặn ngay" bên dưới.
 
 | Task | Trạng thái |
 |---|---|
-| 2.0 Scope freeze, ADR, contracts | ❌ chưa có `docs/` nào |
+| 2.0 Scope freeze, ADR, contracts | 🟡 5 doc + 2 ADR đã soạn (`docs/`), chờ business xác nhận |
 | 2.1 `raw.vinfast_order_status_history` + `vehicle_handover` | ❌ |
 | 2.2 PIT VinFast feature pipeline | ❌ (mock có as-of snapshot nhưng không dựng từ event history) |
 | 2.3 `feature.customer_cross_bu_feature` | ❌ |

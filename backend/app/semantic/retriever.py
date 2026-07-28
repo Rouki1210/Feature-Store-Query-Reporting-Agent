@@ -15,6 +15,13 @@ _TABLE_HINTS = {
         "vinfast", "vf", "ô tô", "oto", "xe điện", "phụ kiện", "đơn xe",
         "ev", "electric vehicle", "car", "scooter", "accessories", "order",
     ),
+    # Cross-BU: chỉ khớp khi câu hỏi thật sự nói tới CẢ HAI đơn vị. Không đưa "gsm"
+    # hay "vinfast" đơn lẻ vào đây, nếu không câu single-BU nào cũng bị cộng điểm.
+    "customer_cross_bu_feature": (
+        "cả hai", "ca hai", "đồng thời", "dong thoi", "vừa", "vua ",
+        "cross bu", "cross-bu", "xuyên đơn vị", "xuyen don vi", "overlap",
+        "khách chung", "khach chung", "both",
+    ),
 }
 
 _WINDOW_ALIASES = {
@@ -28,6 +35,12 @@ _WINDOW_ALIASES = {
     "l6m": ("l6m", "6 tháng", "6 thang", "last 6 months"),
     "l8w": ("l8w", "8 tuần", "8 tuan", "last 8 weeks"),
     "l12m": ("l12m", "12 tháng", "12 thang", "last 12 months"),
+    # Luỹ kế: "tổng cộng bao nhiêu xe đã bàn giao" phải ra cột _all, không phải _l1m.
+    "all": (
+        "toàn thời gian", "toan thoi gian", "tổng cộng", "tong cong", "luỹ kế", "luy ke",
+        "từ trước đến nay", "tu truoc den nay", "từ trước tới nay", "tu truoc toi nay",
+        "all time", "cumulative", "tất cả các kỳ", "tat ca cac ky",
+    ),
 }
 
 _RISK_TERMS = {
@@ -109,7 +122,8 @@ class SemanticLayer:
         from app.db import get_engine
 
         sql = text("""
-            SELECT fc.feature_name, fc.table_schema, fc.table_name, fc.feature_group,
+            SELECT fc.feature_name, fc.table_schema, fc.table_name, fc.business_unit,
+                   fc.feature_group,
                    fc.description_vi, fc.description_en, fc.data_type, fc.aggregation_type,
                    fc.time_window, fc.unit, fc.null_meaning,
                    COALESCE(array_agg(fs.synonym_text)
@@ -125,6 +139,7 @@ class SemanticLayer:
         features = [{
             "name": r["feature_name"],
             "table": f'{r["table_schema"]}.{r["table_name"]}',
+            "business_unit": r["business_unit"],
             "group": r["feature_group"],
             "description_vi": r["description_vi"] or "",
             "description_en": r["description_en"] or "",
@@ -238,12 +253,15 @@ class SemanticLayer:
             if compare and len(window_hints) >= 2
             else None
         )
-        unit = business_unit.lower() if business_unit else None
+        unit = business_unit.upper() if business_unit else None
 
         scored: list[ScoredFeature] = []
         for f, searchable, feature_tokens in self._norm:
             table = f.get("table", "").split(".", 1)[-1]
-            if unit and not table.startswith(unit):
+            # So theo nhãn business_unit của feature, KHÔNG theo tiền tố tên bảng:
+            # tiền tố chỉ tình cờ đúng với gsm_/vinfast_ và trượt hẳn với CROSS_BU
+            # (bảng tên customer_cross_bu_feature).
+            if unit and (f.get("business_unit") or "").upper() != unit:
                 continue
             if group and f.get("group") != group:
                 continue
@@ -252,60 +270,76 @@ class SemanticLayer:
                 continue
             if ratio_window and feature_window != ratio_window:
                 continue
-            has_count = bool(re.search(r"(?:^|_)count(?:_|$)", f.get("name", "")))
-            if metric_hint == "count" and not has_count and "active_day" not in f.get("name", ""):
-                continue
-            if metric_hint == "value" and not any(
-                x in f.get("name", "") for x in ("amount", "price", "discount", "battery")
-            ):
-                continue
-            if metric_hint == "ratio" and f.get("aggregation") != "ratio":
-                continue
-            name = f.get("name", "")
-            if compare and count_requested and not has_count:
-                continue
-            if compare and value_requested and not any(
-                x in name for x in ("amount", "price", "discount", "battery")
-            ):
-                continue
-            if _has_term(q_norm, ("cancel", "canceled", "cancelled", "huy")) and "canceled" not in name:
-                continue
-            if _has_term(q_norm, ("completed", "finished", "hoan thanh")) and not any(
-                x in name for x in ("completed", "finished")
-            ):
-                continue
-            if discount_requested and "discount" not in name:
-                continue
-            if value_requested and not discount_requested:
-                if "discount" in name:
+            # Cờ boolean (is_vehicle_owner, is_cross_bu_active…) và cột cross-BU không
+            # mang token count/completed trong tên — phép đếm nằm ở SQL. Bộ filter
+            # "tên phải chứa X" bên dưới sẽ loại sạch chúng, nên miễn trừ ở đây.
+            # Không miễn thì "bao nhiêu khách đang là chủ xe" trượt sang cột BUYER,
+            # đúng cái nhầm mà cả Sprint 2 dựng ra để tránh.
+            is_cross = table == "customer_cross_bu_feature"
+            if is_cross or f.get("aggregation") == "flag":
+                # Cross-BU phải có tín hiệu "cả hai đơn vị" mới được vào, tránh lọt
+                # vào câu single-BU. Cờ ở bảng BU thì không cần điều kiện đó.
+                if is_cross and not table_scores.get(table):
                     continue
-            if _has_term(q_norm, ("distance", "quang duong", "km")) and "distance" not in name:
-                continue
-            if _has_term(q_norm, ("active day", "ngay hoat dong")) and "active_day" not in name:
-                continue
-            if _has_term(q_norm, ("processing time", "thoi gian xu ly")) and "processing_time" not in name:
-                continue
-            if _has_term(q_norm, ("amount",)):
-                if table == "gsm_transaction":
-                    if "original_price" not in name or "discount" in name:
+                # Cờ boolean không bao giờ là câu trả lời cho câu hỏi về TIỀN.
+                if f.get("aggregation") == "flag" and metric_hint == "value":
+                    continue
+                name = f.get("name", "")
+            else:
+                has_count = bool(re.search(r"(?:^|_)count(?:_|$)", f.get("name", "")))
+                if metric_hint == "count" and not has_count and "active_day" not in f.get("name", ""):
+                    continue
+                if metric_hint == "value" and not any(
+                    x in f.get("name", "") for x in ("amount", "price", "discount", "battery")
+                ):
+                    continue
+                if metric_hint == "ratio" and f.get("aggregation") != "ratio":
+                    continue
+                name = f.get("name", "")
+                if compare and count_requested and not has_count:
+                    continue
+                if compare and value_requested and not any(
+                    x in name for x in ("amount", "price", "discount", "battery")
+                ):
+                    continue
+                if _has_term(q_norm, ("cancel", "canceled", "cancelled", "huy")) and "canceled" not in name:
+                    continue
+                if _has_term(q_norm, ("completed", "finished", "hoan thanh")) and not any(
+                    x in name for x in ("completed", "finished")
+                ):
+                    continue
+                if discount_requested and "discount" not in name:
+                    continue
+                if value_requested and not discount_requested:
+                    if "discount" in name:
                         continue
-                elif "amount" not in name:
+                if _has_term(q_norm, ("distance", "quang duong", "km")) and "distance" not in name:
                     continue
-            if _has_term(q_norm, ("price",)) and "price" not in name:
-                continue
-            if value_requested and not _has_term(q_norm, ("max", "maximum", "highest", "lon nhat")):
-                if name.endswith("_max_" + str(feature_window)) or "_max_" in name:
+                if _has_term(q_norm, ("active day", "ngay hoat dong")) and "active_day" not in name:
                     continue
-            if value_requested and not _has_term(q_norm, ("min", "minimum", "lowest", "nho nhat")):
-                if name.endswith("_min_" + str(feature_window)) or "_min_" in name:
+                if _has_term(q_norm, ("processing time", "thoi gian xu ly")) and "processing_time" not in name:
                     continue
-            if metric_hint == "count" and not _has_term(q_norm, ("active day", "ngay hoat dong")):
-                if "active_day" in name:
+                if _has_term(q_norm, ("amount",)):
+                    if table == "gsm_transaction":
+                        if "original_price" not in name or "discount" in name:
+                            continue
+                    elif "amount" not in name:
+                        continue
+                if _has_term(q_norm, ("price",)) and "price" not in name:
                     continue
-            if not _has_term(q_norm, ("weekday", "ngay trong tuan")) and "weekday" in name:
-                continue
-            if not _has_term(q_norm, ("daytime", "ban ngay")) and "daytime" in name:
-                continue
+                if value_requested and not _has_term(q_norm, ("max", "maximum", "highest", "lon nhat")):
+                    if name.endswith("_max_" + str(feature_window)) or "_max_" in name:
+                        continue
+                if value_requested and not _has_term(q_norm, ("min", "minimum", "lowest", "nho nhat")):
+                    if name.endswith("_min_" + str(feature_window)) or "_min_" in name:
+                        continue
+                if metric_hint == "count" and not _has_term(q_norm, ("active day", "ngay hoat dong")):
+                    if "active_day" in name:
+                        continue
+                if not _has_term(q_norm, ("weekday", "ngay trong tuan")) and "weekday" in name:
+                    continue
+                if not _has_term(q_norm, ("daytime", "ban ngay")) and "daytime" in name:
+                    continue
 
             score = 0.0
             name_norm = _strip_accents(name)

@@ -35,7 +35,9 @@ def build() -> dict:
         features.append({
             "name": feat.name,
             "table": feat.table,
-            "business_unit": "GSM" if feat.table.endswith("gsm_transaction") else "VINFAST",
+            # Đọc từ TABLES (feature_spec) chứ không đoán theo tên bảng: hard-code
+            # "không phải GSM ⇒ VINFAST" từng gắn nhãn sai cả 9 feature cross-BU.
+            "business_unit": TABLES[feat.table]["unit"],
             "group": feat.group,
             "dtype": feat.dtype,
             "aggregation": feat.agg,

@@ -117,7 +117,7 @@ history trực tiếp; view chỉ phục vụ người vận hành xem tay — t
 **File:** `backend/migrations/versions/0004_extend_vinfast_transaction.py`,
 `backend/app/semantic/feature_spec.py`, `backend/scripts/generate_mock_data.py`
 
-- [ ] Sinh mock cho 2 bảng mới trong `generate_raw()`:
+- [x] Sinh mock cho 2 bảng mới trong `generate_raw()`:
       - Mỗi order sinh chuỗi status hợp lệ `created → processing → completed`, mỗi bước
         cách nhau vài ngày, `status_at` nằm trong `EVENT_DAYS_BACK`.
       - Chỉ order `order_type='vehicle'` + completed mới **có thể** có handover, và cố ý
@@ -125,15 +125,15 @@ history trực tiếp; view chỉ phục vụ người vận hành xem tay — t
       - `handed_over_at` = `completed_at` + 5..60 ngày ⇒ có customer là buyer ở snapshot
         này nhưng chỉ thành owner ở snapshot sau. Đây là case chứng minh PIT chạy đúng.
       - Cho ~2% handover `reversed` (trả xe) và ~3% event `recorded_at` trễ 10–40 ngày.
-- [ ] Thêm 7 feature vào `feature_spec.py` (mục VinFast), rồi
+- [x] Thêm 7 feature vào `feature_spec.py` (`_VF_PIT_STEMS`, window=None), rồi
       `python -m scripts.generate_semantic_layer` để cập nhật YAML + mô tả VI/EN:
       `vehicle_purchase_completed_count_l1m`, `vehicle_delivered_count_l1m`,
       `is_vehicle_buyer`, `is_vehicle_owner`, `first_vehicle_purchase_date`,
       `first_vehicle_handover_date`, `days_since_last_vehicle_handover`.
-- [ ] Migration `0004` thêm đúng 7 cột đó vào `feature.vinfast_transaction`.
-      **Test `test_feature_spec_matches_migration` sẽ đỏ nếu lệch** — đó là điểm quan trọng,
-      giữ nguyên cơ chế đó.
-- [ ] Trong `build_features()`, tính theo cutoff:
+- [x] Migration `0004` thêm đúng 7 cột đó vào `feature.vinfast_transaction`.
+      `test_migration_inventory_matches_feature_spec` giờ hợp nhất 0002 + 0004 — cơ chế
+      canh drift giữ nguyên.
+- [x] Trong `build_features()` (`_vehicle_pit`), tính theo cutoff:
       ```python
       cutoff = datetime.combine(snapshot, time.max, UTC)
       completed = [h for h in status_hist[oid] if h["status"]=="completed" and h["status_at"] <= cutoff]
@@ -142,22 +142,22 @@ history trực tiếp; view chỉ phục vụ người vận hành xem tay — t
                and not (h["reversed_at"] and h["reversed_at"] <= cutoff)]
       ```
       Chú ý: reversed **sau** cutoff thì ở snapshot đó khách VẪN là owner.
-- [ ] Thêm vào `data_quality_errors()` 3 invariant:
-      `vehicle_delivered_count_l1m <= vehicle_purchase_completed_count_l1m`;
-      `is_vehicle_owner=1 ⇒ is_vehicle_buyer=1`;
-      `first_vehicle_handover_date >= first_vehicle_purchase_date`.
-- [ ] `tests/test_point_in_time.py`:
-      - future-leak: dựng 1 handover ở ngày D+10, build snapshot D ⇒ `is_vehicle_owner=0`.
-      - late-arriving: `status_at` ≤ D nhưng `recorded_at` > D ⇒ **vẫn tính** (ta dùng
-        event time, không dùng ingest time).
-      - reversed: reverse trước D ⇒ mất owner; reverse sau D ⇒ giữ owner.
-      - buyer ≠ owner: tồn tại ≥1 customer `is_vehicle_buyer=1 AND is_vehicle_owner=0`.
+- [x] Thêm vào `data_quality_errors()` 4 invariant:
+      `is_vehicle_owner ⇒ is_vehicle_buyer`; `first_handover >= first_purchase`;
+      cờ buyer/owner không bao giờ NULL; **phải tồn tại nhóm buyer-not-owner**.
+      ~~`vehicle_delivered_count_l1m <= vehicle_purchase_completed_count_l1m`~~ — **BỎ, sai**:
+      xe mua từ tháng trước mà giao trong tháng này sẽ vi phạm dù dữ liệu hoàn toàn đúng.
+      So sánh chỉ có nghĩa trên số luỹ kế, không phải trong cùng cửa sổ.
+- [x] `tests/test_point_in_time.py` — 14 test, 4 nhóm: future-leak · late-arriving ·
+      reversed (trước/sau snapshot) · buyer≠owner (gồm cả case "đọc lén
+      `vinfast_orders.status`" và "đã hẹn giao nhưng chưa giao"), + 3 test gate dữ liệu.
 
-**Xong khi:** 4 test trên pass 100% và `data_quality_errors()` trả rỗng sau khi seed.
+**Xong khi:** ~~4 test trên pass~~ ✅ 14/14 pass; `data_quality_errors()` rỗng trên mock.
+Còn chờ admin: `alembic upgrade head` (0003+0004) → `generate_mock_data` → catalog có 360 feature.
 
 ---
 
-## Task 2.3 — `feature.customer_cross_bu_feature`
+## Task 2.3 — `feature.customer_cross_bu_feature` ✅ code xong, chờ seed
 
 **Mục tiêu:** trả lời cross-BU bằng **1 bảng đã tính sẵn**, không để LLM tự join.
 
@@ -173,10 +173,15 @@ history trực tiếp; view chỉ phục vụ người vận hành xem tay — t
       vinfast_spend_l1m           NUMERIC(18,2)
       combined_spend_l1m          NUMERIC(18,2)
       dominant_business_unit_l1m  VARCHAR(10)  -- 'GSM' | 'VINFAST' | 'TIE' | NULL
-      cross_bu_engagement_score   NUMERIC(5,4)
-      is_vehicle_owner            BOOLEAN
+      cross_bu_engagement_score   NUMERIC(5,4)  -- min(spend)/max(spend), 0..1
       gsm_active_vehicle_owner_flag BOOLEAN
       ```
+      **9 cột, KHÔNG có `is_vehicle_owner`** (chốt 2026-07-28, khác bản nháp đầu):
+      tên đó đã thuộc `feature.vinfast_transaction`. Trùng tên giữa hai bảng làm generator
+      không biết chọn bảng nào, mà validator lại khớp theo TÊN nên không bắt được — sai im
+      lặng. "Bao nhiêu chủ xe" → bảng VinFast; "chủ xe có đi GSM không" →
+      `gsm_active_vehicle_owner_flag`. `all_features()` có chốt chặn trùng tên toàn cục.
+      Nhãn `business_unit` của bảng này là **`CROSS_BU`**, không phải VINFAST.
 - [ ] **Chốt null/zero semantics và ghi vào `null_meaning` của catalog** (cột này đã có sẵn,
       frontend đang hiển thị):
       - khách chưa từng có đơn VF ⇒ `vinfast_spend_l1m = NULL` (không phải 0) — "không có
@@ -198,7 +203,7 @@ history trực tiếp; view chỉ phục vụ người vận hành xem tay — t
 
 ---
 
-## Task 2.4 — Join catalog + Join Planner
+## Task 2.4 — Join catalog + Join Planner ✅ code xong, chờ migration 0006
 
 **Mục tiêu:** mọi join đều nằm trong danh sách được duyệt; join lạ bị chặn.
 
@@ -347,8 +352,11 @@ nguyên hạ tầng Sprint 1 — chỉ thêm case và category).
 - [ ] Chạy `run_eval --split dev --tag sprint1_final` **TRƯỚC** khi sửa gì → có mốc so sánh.
       Hiện chưa có số baseline nào được ghi lại; không có mốc thì không chứng minh được
       Sprint 2 không làm hỏng Sprint 1.
-- [ ] Thêm ~30 case vào `golden_set.yaml`, category mới: `cross_bu`, `buyer_vs_owner`,
-      `point_in_time`, `multi_turn`, `join_safety`. Chia dev/holdout theo tỉ lệ cũ (2:1).
+- [ ] Thêm ≥30 case vào `golden_set.yaml` — **mỗi UC2-01…UC2-30 ít nhất một dòng**
+      (`docs/sprint2_definition_of_done.md` §3). Category mới: `cross_bu`, `buyer_vs_owner`,
+      `point_in_time`, `multi_turn`, `join_safety`. Chia dev/holdout theo tỉ lệ cũ (2:1),
+      nhưng **4 case an toàn UC2-24…UC2-27 để cả ở dev** — safety không tuning được thì
+      không có lý do giấu vào holdout.
 - [ ] Cập nhật `scripts/golden_dataset.py`: hiện nó **báo lỗi nếu có case cross-BU**
       (`expected_business_unit not in (GSM, VINFAST)`) — đổi thành cho phép `CROSS_BU`.
 - [ ] Sinh lại `HOLDOUT_CHECKSUM` + `HOLDOUT_VERSION` sau khi thêm case, rồi **không đụng nữa**.

@@ -482,7 +482,7 @@ CREATE TABLE IF NOT EXISTS metadata.feature_catalog (
     updated_at              TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT chk_feature_catalog_bu
-        CHECK (business_unit IN ('GSM', 'VINFAST')),
+        CHECK (business_unit IN ('GSM', 'VINFAST', 'CROSS_BU')),
 
     CONSTRAINT chk_feature_catalog_sensitivity
         CHECK (

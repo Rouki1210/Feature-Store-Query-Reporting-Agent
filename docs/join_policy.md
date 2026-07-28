@@ -56,6 +56,20 @@ Khi agent join runtime (đường số 2): mặc định **LEFT JOIN** từ bả
 Phân biệt NULL vs 0 là bắt buộc: trung bình chi tiêu VF tính trên cả khách chưa từng mua xe
 là con số sai mà SQL vẫn đúng. Coverage warning (`non_null_ratio`) phải hiện lên UI.
 
+Quy ước này phải nằm trong **mô tả catalog**, không chỉ trong doc — LLM chỉ đọc mô tả để chọn
+cột. Ba cột spend dùng `null_meaning = no_history_in_unit`; `dominant_business_unit_l1m` và
+`cross_bu_engagement_score` dùng `no_spend_to_compare`.
+
+### Quy ước đặt tên cột trong bảng cross-BU
+
+Bảng có **9 cột** và **không lặp lại `is_vehicle_owner`** — tên đó đã thuộc
+`feature.vinfast_transaction`. Trùng tên giữa hai bảng làm SQL generator không biết chọn bảng
+nào, trong khi validator khớp theo tên nên không phát hiện được. Câu hỏi "chủ xe có hoạt động
+GSM không" dùng `gsm_active_vehicle_owner_flag`.
+
+Nhãn `business_unit` của bảng là **`CROSS_BU`** (không phải VINFAST) — retriever định tuyến
+theo nhãn này.
+
 ## 6. `metadata.join_catalog` — nguồn sự thật
 
 Catalog nằm trong DB, **không** có bản YAML song song (2 nguồn cho 1 sự thật = drift).

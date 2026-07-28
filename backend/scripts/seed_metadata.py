@@ -60,7 +60,8 @@ def seed() -> tuple[int, int]:
             text("""
                 DELETE FROM metadata.feature_catalog
                 WHERE table_schema='feature'
-                  AND table_name IN ('gsm_transaction', 'vinfast_transaction')
+                  AND table_name IN ('gsm_transaction', 'vinfast_transaction',
+                                     'customer_cross_bu_feature')
                   AND NOT (feature_name = ANY(:names))
             """),
             {"names": names},
@@ -94,9 +95,45 @@ def seed() -> tuple[int, int]:
     return len(features), synonym_count
 
 
+def seed_join_catalog() -> int:
+    """Chiếu `DEFAULT_RULES` của Join Planner vào `metadata.join_catalog`.
+
+    Nguồn sự thật là DB (docs/join_policy.md §6); `DEFAULT_RULES` chỉ là bản seed +
+    fallback khi chưa có DB. Rebuild idempotent: dòng không còn trong DEFAULT_RULES
+    bị tắt (`is_active=FALSE`) chứ không xóa, để còn truy vết log cũ.
+    """
+    from app.agent.join_planner import DEFAULT_RULES
+
+    with get_engine().begin() as conn:
+        # Tắt hết rồi bật lại theo DEFAULT_RULES. Cách này thay cho so sánh row-value
+        # `(left,right) <> ALL(:pairs)` — psycopg không truyền được mảng tuple
+        # ("input of anonymous composite types is not implemented").
+        conn.execute(text("UPDATE metadata.join_catalog SET is_active = FALSE"))
+        for rule in DEFAULT_RULES:
+            conn.execute(text("""
+                INSERT INTO metadata.join_catalog
+                  (left_table, right_table, join_keys, join_type, cardinality,
+                   requires_snapshot_key, allowed_intents, explanation_vi, is_active)
+                VALUES (:left, :right, :keys, :type, :card, :snap, :intents, :why, TRUE)
+                ON CONFLICT (left_table, right_table) DO UPDATE SET
+                  join_keys=EXCLUDED.join_keys, join_type=EXCLUDED.join_type,
+                  cardinality=EXCLUDED.cardinality,
+                  requires_snapshot_key=EXCLUDED.requires_snapshot_key,
+                  allowed_intents=EXCLUDED.allowed_intents,
+                  explanation_vi=EXCLUDED.explanation_vi, is_active=TRUE
+            """), {
+                "left": rule.left_table, "right": rule.right_table,
+                "keys": list(rule.join_keys), "type": rule.join_type,
+                "card": rule.cardinality, "snap": rule.requires_snapshot_key,
+                "intents": ["cross_bu"], "why": rule.explanation_vi,
+            })
+    return len(DEFAULT_RULES)
+
+
 def main() -> None:
     features, synonyms = seed()
-    print(f"Seeded metadata from YAML: features={features}, synonyms={synonyms}")
+    joins = seed_join_catalog()
+    print(f"Seeded metadata from YAML: features={features}, synonyms={synonyms}, joins={joins}")
 
 
 if __name__ == "__main__":

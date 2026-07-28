@@ -6,6 +6,6 @@ from scripts.generate_mock_data import build_features, data_quality_errors, gene
 def test_mock_data_is_repeatable_and_passes_quality_gate():
     first = generate_raw()
     assert first == generate_raw()
-    customers, _dates, trips, orders = first
-    gsm, vinfast = build_features(customers, trips, orders)
-    assert data_quality_errors(customers, trips, orders, gsm, vinfast) == []
+    customers, _dates, trips, orders, history, handovers = first
+    gsm, vinfast = build_features(customers, trips, orders, history=history, handovers=handovers)
+    assert data_quality_errors(customers, trips, orders, gsm, vinfast, handovers) == []

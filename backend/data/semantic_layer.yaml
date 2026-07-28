@@ -8,6 +8,10 @@ meta:
       unit: VINFAST
       vi: VinFast — giao dịch xe, phụ kiện và dịch vụ
       en: VinFast — vehicle, accessories and service transactions
+    feature.customer_cross_bu_feature:
+      unit: CROSS_BU
+      vi: Xuyên đơn vị — khách dùng cả GSM và VinFast
+      en: Cross-BU — customers active in both GSM and VinFast
   groups:
   - Giá trị & số dư
   - Hành trình & trạng thái
@@ -15,7 +19,7 @@ meta:
   - Tỷ lệ & xu hướng
   - Sản phẩm & dịch vụ
   - Hoạt động & tần suất
-  feature_count: 353
+  feature_count: 406
   note: 'Sinh tự động — KHÔNG sửa tay. Nguồn: app/semantic/feature_spec.py + feature_describer.py'
 features:
 - name: canceled_original_price_max_daily
@@ -10666,4 +10670,1889 @@ features:
   - đơn xe
   support_status: needs_review
   is_queryable: false
+  is_active: true
+- name: vehicle_purchase_completed_count_l1m
+  table: feature.vinfast_transaction
+  business_unit: VINFAST
+  group: Hoạt động & tần suất
+  dtype: integer
+  aggregation: count
+  window: l1m
+  unit: vehicles
+  null_meaning: no_event_in_window
+  description_vi: 'VinFast: Số số đơn mua xe hoàn tất trong 1 tháng gần nhất. Completed/finished chỉ phản ánh trạng thái giao
+    dịch. Mua xe KHÔNG đồng nghĩa đã nhận xe. NULL khi không có sự kiện trong cửa sổ.'
+  description_en: 'VinFast: Completed Vehicle Purchase Count over the last 1 month. Completed/finished describes transaction
+    status only. Buying a vehicle does not mean it has been handed over. NULL when no event exists in the window.'
+  keywords:
+  - car
+  - chot don xe
+  - completed vehicle purchase count
+  - da mua xe
+  - don xe hoan tat
+  - giao dịch
+  - hoạt động & tần suất
+  - khach mua xe
+  - order
+  - số đơn mua xe hoàn tất
+  - vehicle
+  - vehicle purchase completed count
+  - vehicle purchase completed count l1m
+  - vehicle_purchase_completed_count_l1m
+  - vf
+  - vinfast
+  - đơn xe
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: vehicle_purchase_completed_count_l3m
+  table: feature.vinfast_transaction
+  business_unit: VINFAST
+  group: Hoạt động & tần suất
+  dtype: integer
+  aggregation: count
+  window: l3m
+  unit: vehicles
+  null_meaning: no_event_in_window
+  description_vi: 'VinFast: Số số đơn mua xe hoàn tất trong 3 tháng gần nhất. Completed/finished chỉ phản ánh trạng thái giao
+    dịch. Mua xe KHÔNG đồng nghĩa đã nhận xe. NULL khi không có sự kiện trong cửa sổ.'
+  description_en: 'VinFast: Completed Vehicle Purchase Count over the last 3 months. Completed/finished describes transaction
+    status only. Buying a vehicle does not mean it has been handed over. NULL when no event exists in the window.'
+  keywords:
+  - car
+  - chot don xe
+  - completed vehicle purchase count
+  - da mua xe
+  - don xe hoan tat
+  - giao dịch
+  - hoạt động & tần suất
+  - khach mua xe
+  - order
+  - số đơn mua xe hoàn tất
+  - vehicle
+  - vehicle purchase completed count
+  - vehicle purchase completed count l3m
+  - vehicle_purchase_completed_count_l3m
+  - vf
+  - vinfast
+  - đơn xe
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: vehicle_purchase_completed_count_l6m
+  table: feature.vinfast_transaction
+  business_unit: VINFAST
+  group: Hoạt động & tần suất
+  dtype: integer
+  aggregation: count
+  window: l6m
+  unit: vehicles
+  null_meaning: no_event_in_window
+  description_vi: 'VinFast: Số số đơn mua xe hoàn tất trong 6 tháng gần nhất. Completed/finished chỉ phản ánh trạng thái giao
+    dịch. Mua xe KHÔNG đồng nghĩa đã nhận xe. NULL khi không có sự kiện trong cửa sổ.'
+  description_en: 'VinFast: Completed Vehicle Purchase Count over the last 6 months. Completed/finished describes transaction
+    status only. Buying a vehicle does not mean it has been handed over. NULL when no event exists in the window.'
+  keywords:
+  - car
+  - chot don xe
+  - completed vehicle purchase count
+  - da mua xe
+  - don xe hoan tat
+  - giao dịch
+  - hoạt động & tần suất
+  - khach mua xe
+  - order
+  - số đơn mua xe hoàn tất
+  - vehicle
+  - vehicle purchase completed count
+  - vehicle purchase completed count l6m
+  - vehicle_purchase_completed_count_l6m
+  - vf
+  - vinfast
+  - đơn xe
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: vehicle_purchase_completed_count_l12m
+  table: feature.vinfast_transaction
+  business_unit: VINFAST
+  group: Hoạt động & tần suất
+  dtype: integer
+  aggregation: count
+  window: l12m
+  unit: vehicles
+  null_meaning: no_event_in_window
+  description_vi: 'VinFast: Số số đơn mua xe hoàn tất trong 12 tháng gần nhất. Completed/finished chỉ phản ánh trạng thái
+    giao dịch. Mua xe KHÔNG đồng nghĩa đã nhận xe. NULL khi không có sự kiện trong cửa sổ.'
+  description_en: 'VinFast: Completed Vehicle Purchase Count over the last 12 months. Completed/finished describes transaction
+    status only. Buying a vehicle does not mean it has been handed over. NULL when no event exists in the window.'
+  keywords:
+  - car
+  - chot don xe
+  - completed vehicle purchase count
+  - da mua xe
+  - don xe hoan tat
+  - giao dịch
+  - hoạt động & tần suất
+  - khach mua xe
+  - order
+  - số đơn mua xe hoàn tất
+  - vehicle
+  - vehicle purchase completed count
+  - vehicle purchase completed count l12m
+  - vehicle_purchase_completed_count_l12m
+  - vf
+  - vinfast
+  - đơn xe
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: vehicle_purchase_completed_count_all
+  table: feature.vinfast_transaction
+  business_unit: VINFAST
+  group: Hoạt động & tần suất
+  dtype: integer
+  aggregation: count
+  window: all
+  unit: vehicles
+  null_meaning: no_event_in_window
+  description_vi: 'VinFast: Số số đơn mua xe hoàn tất trong toàn thời gian tính tới ngày snapshot. Completed/finished chỉ
+    phản ánh trạng thái giao dịch. Mua xe KHÔNG đồng nghĩa đã nhận xe. NULL khi không có sự kiện trong cửa sổ.'
+  description_en: 'VinFast: Completed Vehicle Purchase Count over the all time up to the snapshot date. Completed/finished
+    describes transaction status only. Buying a vehicle does not mean it has been handed over. NULL when no event exists in
+    the window.'
+  keywords:
+  - car
+  - chot don xe
+  - completed vehicle purchase count
+  - da mua xe
+  - don xe hoan tat
+  - giao dịch
+  - hoạt động & tần suất
+  - khach mua xe
+  - order
+  - số đơn mua xe hoàn tất
+  - vehicle
+  - vehicle purchase completed count
+  - vehicle purchase completed count all
+  - vehicle_purchase_completed_count_all
+  - vf
+  - vinfast
+  - đơn xe
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: vehicle_delivered_count_l1m
+  table: feature.vinfast_transaction
+  business_unit: VINFAST
+  group: Hoạt động & tần suất
+  dtype: integer
+  aggregation: count
+  window: l1m
+  unit: vehicles
+  null_meaning: no_event_in_window
+  description_vi: 'VinFast: Số số xe đã bàn giao trong 1 tháng gần nhất. NULL khi không có sự kiện trong cửa sổ.'
+  description_en: 'VinFast: Delivered Vehicle Count over the last 1 month. NULL when no event exists in the window.'
+  keywords:
+  - car
+  - delivered vehicle count
+  - giao dịch
+  - hoạt động & tần suất
+  - order
+  - số xe đã bàn giao
+  - vehicle
+  - vehicle delivered count
+  - vehicle delivered count l1m
+  - vehicle_delivered_count_l1m
+  - vf
+  - vinfast
+  - đơn xe
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: vehicle_delivered_count_l3m
+  table: feature.vinfast_transaction
+  business_unit: VINFAST
+  group: Hoạt động & tần suất
+  dtype: integer
+  aggregation: count
+  window: l3m
+  unit: vehicles
+  null_meaning: no_event_in_window
+  description_vi: 'VinFast: Số số xe đã bàn giao trong 3 tháng gần nhất. NULL khi không có sự kiện trong cửa sổ.'
+  description_en: 'VinFast: Delivered Vehicle Count over the last 3 months. NULL when no event exists in the window.'
+  keywords:
+  - car
+  - delivered vehicle count
+  - giao dịch
+  - hoạt động & tần suất
+  - order
+  - số xe đã bàn giao
+  - vehicle
+  - vehicle delivered count
+  - vehicle delivered count l3m
+  - vehicle_delivered_count_l3m
+  - vf
+  - vinfast
+  - đơn xe
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: vehicle_delivered_count_l6m
+  table: feature.vinfast_transaction
+  business_unit: VINFAST
+  group: Hoạt động & tần suất
+  dtype: integer
+  aggregation: count
+  window: l6m
+  unit: vehicles
+  null_meaning: no_event_in_window
+  description_vi: 'VinFast: Số số xe đã bàn giao trong 6 tháng gần nhất. NULL khi không có sự kiện trong cửa sổ.'
+  description_en: 'VinFast: Delivered Vehicle Count over the last 6 months. NULL when no event exists in the window.'
+  keywords:
+  - car
+  - delivered vehicle count
+  - giao dịch
+  - hoạt động & tần suất
+  - order
+  - số xe đã bàn giao
+  - vehicle
+  - vehicle delivered count
+  - vehicle delivered count l6m
+  - vehicle_delivered_count_l6m
+  - vf
+  - vinfast
+  - đơn xe
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: vehicle_delivered_count_l12m
+  table: feature.vinfast_transaction
+  business_unit: VINFAST
+  group: Hoạt động & tần suất
+  dtype: integer
+  aggregation: count
+  window: l12m
+  unit: vehicles
+  null_meaning: no_event_in_window
+  description_vi: 'VinFast: Số số xe đã bàn giao trong 12 tháng gần nhất. NULL khi không có sự kiện trong cửa sổ.'
+  description_en: 'VinFast: Delivered Vehicle Count over the last 12 months. NULL when no event exists in the window.'
+  keywords:
+  - car
+  - delivered vehicle count
+  - giao dịch
+  - hoạt động & tần suất
+  - order
+  - số xe đã bàn giao
+  - vehicle
+  - vehicle delivered count
+  - vehicle delivered count l12m
+  - vehicle_delivered_count_l12m
+  - vf
+  - vinfast
+  - đơn xe
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: vehicle_delivered_count_all
+  table: feature.vinfast_transaction
+  business_unit: VINFAST
+  group: Hoạt động & tần suất
+  dtype: integer
+  aggregation: count
+  window: all
+  unit: vehicles
+  null_meaning: no_event_in_window
+  description_vi: 'VinFast: Số số xe đã bàn giao trong toàn thời gian tính tới ngày snapshot. NULL khi không có sự kiện trong
+    cửa sổ.'
+  description_en: 'VinFast: Delivered Vehicle Count over the all time up to the snapshot date. NULL when no event exists in
+    the window.'
+  keywords:
+  - car
+  - delivered vehicle count
+  - giao dịch
+  - hoạt động & tần suất
+  - order
+  - số xe đã bàn giao
+  - vehicle
+  - vehicle delivered count
+  - vehicle delivered count all
+  - vehicle_delivered_count_all
+  - vf
+  - vinfast
+  - đơn xe
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: is_vehicle_buyer
+  table: feature.vinfast_transaction
+  business_unit: VINFAST
+  group: Hành trình & trạng thái
+  dtype: boolean
+  aggregation: flag
+  window: null
+  unit: null
+  null_meaning: always_present
+  description_vi: 'VinFast: Cờ khách đã mua xe. Mua xe KHÔNG đồng nghĩa đã nhận xe. Luôn có giá trị: FALSE nghĩa là không
+    phải, không phải thiếu dữ liệu.'
+  description_en: 'VinFast: Flag: is vehicle buyer. Buying a vehicle does not mean it has been handed over. Always populated:
+    FALSE means not applicable, not missing data.'
+  keywords:
+  - buyer
+  - car
+  - chot don xe
+  - chủ sở hữu
+  - da mua xe
+  - don xe hoan tat
+  - giao dịch
+  - hành trình & trạng thái
+  - is vehicle buyer
+  - is_vehicle_buyer
+  - khach mua xe
+  - khách đã mua xe
+  - người mua
+  - order
+  - owner
+  - vehicle
+  - vf
+  - vinfast
+  - đơn xe
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: is_vehicle_owner
+  table: feature.vinfast_transaction
+  business_unit: VINFAST
+  group: Hành trình & trạng thái
+  dtype: boolean
+  aggregation: flag
+  window: null
+  unit: null
+  null_meaning: always_present
+  description_vi: 'VinFast: Cờ khách đang là chủ xe. Chủ xe chỉ tính từ bản ghi bàn giao, KHÔNG suy từ đơn hoàn tất. Luôn
+    có giá trị: FALSE nghĩa là không phải, không phải thiếu dữ liệu.'
+  description_en: 'VinFast: Flag: is vehicle owner. Ownership comes from handover records only, never from order status. Always
+    populated: FALSE means not applicable, not missing data.'
+  keywords:
+  - ban giao xe
+  - buyer
+  - car
+  - chu xe
+  - chủ sở hữu
+  - da nhan xe
+  - dung ten xe
+  - giao dịch
+  - hành trình & trạng thái
+  - is vehicle owner
+  - is_vehicle_owner
+  - khách đang là chủ xe
+  - người mua
+  - order
+  - owner
+  - 'owner: chỉ từ bản ghi bàn giao, không suy từ trạng thái đơn.'
+  - so huu xe
+  - vehicle
+  - vf
+  - vinfast
+  - đơn xe
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: is_vehicle_handover_scheduled
+  table: feature.vinfast_transaction
+  business_unit: VINFAST
+  group: Hành trình & trạng thái
+  dtype: boolean
+  aggregation: flag
+  window: null
+  unit: null
+  null_meaning: always_present
+  description_vi: 'VinFast: Cờ đã hẹn lịch giao xe nhưng chưa nhận. Chủ xe chỉ tính từ bản ghi bàn giao, KHÔNG suy từ đơn
+    hoàn tất. Luôn có giá trị: FALSE nghĩa là không phải, không phải thiếu dữ liệu.'
+  description_en: 'VinFast: Flag: vehicle handover scheduled but not completed. Ownership comes from handover records only,
+    never from order status. Always populated: FALSE means not applicable, not missing data.'
+  keywords:
+  - car
+  - cho nhan xe
+  - da hen giao
+  - giao dịch
+  - hen lich giao xe
+  - hành trình & trạng thái
+  - is vehicle handover scheduled
+  - is_vehicle_handover_scheduled
+  - order
+  - 'owner: chỉ từ bản ghi bàn giao, không suy từ trạng thái đơn.'
+  - sap nhan xe
+  - vehicle
+  - vehicle handover scheduled but not completed
+  - vf
+  - vinfast
+  - đã hẹn lịch giao xe nhưng chưa nhận
+  - đơn xe
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: first_vehicle_purchase_date
+  table: feature.vinfast_transaction
+  business_unit: VINFAST
+  group: Thời gian & gắn kết
+  dtype: date
+  aggregation: min
+  window: null
+  unit: vehicles
+  null_meaning: never_event
+  description_vi: 'VinFast: ngày mua xe đầu tiên. Mua xe KHÔNG đồng nghĩa đã nhận xe. NULL khi không có sự kiện trong cửa
+    sổ.'
+  description_en: 'VinFast: first vehicle purchase date. Buying a vehicle does not mean it has been handed over. NULL when
+    no event exists in the window.'
+  keywords:
+  - car
+  - chot don xe
+  - da mua xe
+  - don xe hoan tat
+  - first vehicle purchase date
+  - first_vehicle_purchase_date
+  - giao dịch
+  - khach mua xe
+  - ngày mua xe đầu tiên
+  - order
+  - thời gian & gắn kết
+  - vehicle
+  - vf
+  - vinfast
+  - đơn xe
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: first_vehicle_handover_date
+  table: feature.vinfast_transaction
+  business_unit: VINFAST
+  group: Thời gian & gắn kết
+  dtype: date
+  aggregation: min
+  window: null
+  unit: null
+  null_meaning: never_event
+  description_vi: 'VinFast: ngày nhận xe đầu tiên. Chủ xe chỉ tính từ bản ghi bàn giao, KHÔNG suy từ đơn hoàn tất. NULL khi
+    không có sự kiện trong cửa sổ.'
+  description_en: 'VinFast: first vehicle handover date. Ownership comes from handover records only, never from order status.
+    NULL when no event exists in the window.'
+  keywords:
+  - ban giao xe
+  - car
+  - chu xe
+  - da nhan xe
+  - dung ten xe
+  - first vehicle handover date
+  - first_vehicle_handover_date
+  - giao dịch
+  - ngày nhận xe đầu tiên
+  - order
+  - 'owner: chỉ từ bản ghi bàn giao, không suy từ trạng thái đơn.'
+  - so huu xe
+  - thời gian & gắn kết
+  - vehicle
+  - vf
+  - vinfast
+  - đơn xe
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: days_since_last_vehicle_handover
+  table: feature.vinfast_transaction
+  business_unit: VINFAST
+  group: Thời gian & gắn kết
+  dtype: integer
+  aggregation: derived
+  window: null
+  unit: days
+  null_meaning: never_event
+  description_vi: 'VinFast: số ngày kể từ lần nhận xe gần nhất. Chủ xe chỉ tính từ bản ghi bàn giao, KHÔNG suy từ đơn hoàn
+    tất. NULL khi không có sự kiện trong cửa sổ.'
+  description_en: 'VinFast: days since last vehicle handover. Ownership comes from handover records only, never from order
+    status. NULL when no event exists in the window.'
+  keywords:
+  - ban giao xe
+  - car
+  - chu xe
+  - chua quay lai
+  - da nhan xe
+  - days since last vehicle handover
+  - days_since_last_vehicle_handover
+  - dung ten xe
+  - giao dịch
+  - lan cuoi
+  - lau khong su dung
+  - order
+  - 'owner: chỉ từ bản ghi bàn giao, không suy từ trạng thái đơn.'
+  - so huu xe
+  - số ngày kể từ lần nhận xe gần nhất
+  - thời gian & gắn kết
+  - vehicle
+  - vf
+  - vinfast
+  - đơn xe
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: is_active_gsm_l1m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: boolean
+  aggregation: flag
+  window: l1m
+  unit: null
+  null_meaning: always_present
+  description_vi: 'GSM + VinFast: Cờ có hoạt động GSM trong 1 tháng gần nhất. Luôn có giá trị: FALSE nghĩa là không phải,
+    không phải thiếu dữ liệu.'
+  description_en: 'GSM + VinFast: Flag: active on GSM over the last 1 month. Always populated: FALSE means not applicable,
+    not missing data.'
+  keywords:
+  - active on gsm
+  - chung
+  - cross bu
+  - có hoạt động gsm
+  - cả hai
+  - gsm
+  - gsm + vinfast
+  - hành trình & trạng thái
+  - is active gsm
+  - is active gsm l1m
+  - is_active_gsm_l1m
+  - overlap
+  - vf
+  - vinfast
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: is_active_gsm_l3m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: boolean
+  aggregation: flag
+  window: l3m
+  unit: null
+  null_meaning: always_present
+  description_vi: 'GSM + VinFast: Cờ có hoạt động GSM trong 3 tháng gần nhất. Luôn có giá trị: FALSE nghĩa là không phải,
+    không phải thiếu dữ liệu.'
+  description_en: 'GSM + VinFast: Flag: active on GSM over the last 3 months. Always populated: FALSE means not applicable,
+    not missing data.'
+  keywords:
+  - active on gsm
+  - chung
+  - cross bu
+  - có hoạt động gsm
+  - cả hai
+  - gsm
+  - gsm + vinfast
+  - hành trình & trạng thái
+  - is active gsm
+  - is active gsm l3m
+  - is_active_gsm_l3m
+  - overlap
+  - vf
+  - vinfast
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: is_active_gsm_l6m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: boolean
+  aggregation: flag
+  window: l6m
+  unit: null
+  null_meaning: always_present
+  description_vi: 'GSM + VinFast: Cờ có hoạt động GSM trong 6 tháng gần nhất. Luôn có giá trị: FALSE nghĩa là không phải,
+    không phải thiếu dữ liệu.'
+  description_en: 'GSM + VinFast: Flag: active on GSM over the last 6 months. Always populated: FALSE means not applicable,
+    not missing data.'
+  keywords:
+  - active on gsm
+  - chung
+  - cross bu
+  - có hoạt động gsm
+  - cả hai
+  - gsm
+  - gsm + vinfast
+  - hành trình & trạng thái
+  - is active gsm
+  - is active gsm l6m
+  - is_active_gsm_l6m
+  - overlap
+  - vf
+  - vinfast
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: is_active_gsm_l12m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: boolean
+  aggregation: flag
+  window: l12m
+  unit: null
+  null_meaning: always_present
+  description_vi: 'GSM + VinFast: Cờ có hoạt động GSM trong 12 tháng gần nhất. Luôn có giá trị: FALSE nghĩa là không phải,
+    không phải thiếu dữ liệu.'
+  description_en: 'GSM + VinFast: Flag: active on GSM over the last 12 months. Always populated: FALSE means not applicable,
+    not missing data.'
+  keywords:
+  - active on gsm
+  - chung
+  - cross bu
+  - có hoạt động gsm
+  - cả hai
+  - gsm
+  - gsm + vinfast
+  - hành trình & trạng thái
+  - is active gsm
+  - is active gsm l12m
+  - is_active_gsm_l12m
+  - overlap
+  - vf
+  - vinfast
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: is_active_gsm_all
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: boolean
+  aggregation: flag
+  window: all
+  unit: null
+  null_meaning: always_present
+  description_vi: 'GSM + VinFast: Cờ có hoạt động GSM trong toàn thời gian tính tới ngày snapshot. Luôn có giá trị: FALSE
+    nghĩa là không phải, không phải thiếu dữ liệu.'
+  description_en: 'GSM + VinFast: Flag: active on GSM over the all time up to the snapshot date. Always populated: FALSE means
+    not applicable, not missing data.'
+  keywords:
+  - active on gsm
+  - chung
+  - cross bu
+  - có hoạt động gsm
+  - cả hai
+  - gsm
+  - gsm + vinfast
+  - hành trình & trạng thái
+  - is active gsm
+  - is active gsm all
+  - is_active_gsm_all
+  - overlap
+  - vf
+  - vinfast
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: is_active_vinfast_l1m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: boolean
+  aggregation: flag
+  window: l1m
+  unit: null
+  null_meaning: always_present
+  description_vi: 'GSM + VinFast: Cờ có hoạt động VinFast trong 1 tháng gần nhất. Luôn có giá trị: FALSE nghĩa là không phải,
+    không phải thiếu dữ liệu.'
+  description_en: 'GSM + VinFast: Flag: active on VinFast over the last 1 month. Always populated: FALSE means not applicable,
+    not missing data.'
+  keywords:
+  - active on vinfast
+  - chung
+  - cross bu
+  - có hoạt động vinfast
+  - cả hai
+  - gsm
+  - gsm + vinfast
+  - hành trình & trạng thái
+  - is active vinfast
+  - is active vinfast l1m
+  - is_active_vinfast_l1m
+  - overlap
+  - vf
+  - vinfast
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: is_active_vinfast_l3m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: boolean
+  aggregation: flag
+  window: l3m
+  unit: null
+  null_meaning: always_present
+  description_vi: 'GSM + VinFast: Cờ có hoạt động VinFast trong 3 tháng gần nhất. Luôn có giá trị: FALSE nghĩa là không phải,
+    không phải thiếu dữ liệu.'
+  description_en: 'GSM + VinFast: Flag: active on VinFast over the last 3 months. Always populated: FALSE means not applicable,
+    not missing data.'
+  keywords:
+  - active on vinfast
+  - chung
+  - cross bu
+  - có hoạt động vinfast
+  - cả hai
+  - gsm
+  - gsm + vinfast
+  - hành trình & trạng thái
+  - is active vinfast
+  - is active vinfast l3m
+  - is_active_vinfast_l3m
+  - overlap
+  - vf
+  - vinfast
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: is_active_vinfast_l6m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: boolean
+  aggregation: flag
+  window: l6m
+  unit: null
+  null_meaning: always_present
+  description_vi: 'GSM + VinFast: Cờ có hoạt động VinFast trong 6 tháng gần nhất. Luôn có giá trị: FALSE nghĩa là không phải,
+    không phải thiếu dữ liệu.'
+  description_en: 'GSM + VinFast: Flag: active on VinFast over the last 6 months. Always populated: FALSE means not applicable,
+    not missing data.'
+  keywords:
+  - active on vinfast
+  - chung
+  - cross bu
+  - có hoạt động vinfast
+  - cả hai
+  - gsm
+  - gsm + vinfast
+  - hành trình & trạng thái
+  - is active vinfast
+  - is active vinfast l6m
+  - is_active_vinfast_l6m
+  - overlap
+  - vf
+  - vinfast
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: is_active_vinfast_l12m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: boolean
+  aggregation: flag
+  window: l12m
+  unit: null
+  null_meaning: always_present
+  description_vi: 'GSM + VinFast: Cờ có hoạt động VinFast trong 12 tháng gần nhất. Luôn có giá trị: FALSE nghĩa là không phải,
+    không phải thiếu dữ liệu.'
+  description_en: 'GSM + VinFast: Flag: active on VinFast over the last 12 months. Always populated: FALSE means not applicable,
+    not missing data.'
+  keywords:
+  - active on vinfast
+  - chung
+  - cross bu
+  - có hoạt động vinfast
+  - cả hai
+  - gsm
+  - gsm + vinfast
+  - hành trình & trạng thái
+  - is active vinfast
+  - is active vinfast l12m
+  - is_active_vinfast_l12m
+  - overlap
+  - vf
+  - vinfast
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: is_active_vinfast_all
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: boolean
+  aggregation: flag
+  window: all
+  unit: null
+  null_meaning: always_present
+  description_vi: 'GSM + VinFast: Cờ có hoạt động VinFast trong toàn thời gian tính tới ngày snapshot. Luôn có giá trị: FALSE
+    nghĩa là không phải, không phải thiếu dữ liệu.'
+  description_en: 'GSM + VinFast: Flag: active on VinFast over the all time up to the snapshot date. Always populated: FALSE
+    means not applicable, not missing data.'
+  keywords:
+  - active on vinfast
+  - chung
+  - cross bu
+  - có hoạt động vinfast
+  - cả hai
+  - gsm
+  - gsm + vinfast
+  - hành trình & trạng thái
+  - is active vinfast
+  - is active vinfast all
+  - is_active_vinfast_all
+  - overlap
+  - vf
+  - vinfast
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: is_cross_bu_active_l1m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: boolean
+  aggregation: flag
+  window: l1m
+  unit: null
+  null_meaning: always_present
+  description_vi: 'GSM + VinFast: Cờ hoạt động ở CẢ GSM và VinFast trong 1 tháng gần nhất. Luôn có giá trị: FALSE nghĩa là
+    không phải, không phải thiếu dữ liệu.'
+  description_en: 'GSM + VinFast: Flag: active on both GSM and VinFast over the last 1 month. Always populated: FALSE means
+    not applicable, not missing data.'
+  keywords:
+  - active on both gsm and vinfast
+  - ca gsm va vinfast
+  - ca hai don vi
+  - chung
+  - cross bu
+  - cả hai
+  - gsm
+  - gsm + vinfast
+  - hoạt động ở cả gsm và vinfast
+  - hành trình & trạng thái
+  - is cross bu active
+  - is cross bu active l1m
+  - is_cross_bu_active_l1m
+  - khach chung
+  - khach dung ca hai
+  - overlap
+  - vf
+  - vinfast
+  - vua di gsm vua mua vinfast
+  - vừa
+  - xuyen don vi
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: is_cross_bu_active_l3m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: boolean
+  aggregation: flag
+  window: l3m
+  unit: null
+  null_meaning: always_present
+  description_vi: 'GSM + VinFast: Cờ hoạt động ở CẢ GSM và VinFast trong 3 tháng gần nhất. Luôn có giá trị: FALSE nghĩa là
+    không phải, không phải thiếu dữ liệu.'
+  description_en: 'GSM + VinFast: Flag: active on both GSM and VinFast over the last 3 months. Always populated: FALSE means
+    not applicable, not missing data.'
+  keywords:
+  - active on both gsm and vinfast
+  - ca gsm va vinfast
+  - ca hai don vi
+  - chung
+  - cross bu
+  - cả hai
+  - gsm
+  - gsm + vinfast
+  - hoạt động ở cả gsm và vinfast
+  - hành trình & trạng thái
+  - is cross bu active
+  - is cross bu active l3m
+  - is_cross_bu_active_l3m
+  - khach chung
+  - khach dung ca hai
+  - overlap
+  - vf
+  - vinfast
+  - vua di gsm vua mua vinfast
+  - vừa
+  - xuyen don vi
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: is_cross_bu_active_l6m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: boolean
+  aggregation: flag
+  window: l6m
+  unit: null
+  null_meaning: always_present
+  description_vi: 'GSM + VinFast: Cờ hoạt động ở CẢ GSM và VinFast trong 6 tháng gần nhất. Luôn có giá trị: FALSE nghĩa là
+    không phải, không phải thiếu dữ liệu.'
+  description_en: 'GSM + VinFast: Flag: active on both GSM and VinFast over the last 6 months. Always populated: FALSE means
+    not applicable, not missing data.'
+  keywords:
+  - active on both gsm and vinfast
+  - ca gsm va vinfast
+  - ca hai don vi
+  - chung
+  - cross bu
+  - cả hai
+  - gsm
+  - gsm + vinfast
+  - hoạt động ở cả gsm và vinfast
+  - hành trình & trạng thái
+  - is cross bu active
+  - is cross bu active l6m
+  - is_cross_bu_active_l6m
+  - khach chung
+  - khach dung ca hai
+  - overlap
+  - vf
+  - vinfast
+  - vua di gsm vua mua vinfast
+  - vừa
+  - xuyen don vi
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: is_cross_bu_active_l12m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: boolean
+  aggregation: flag
+  window: l12m
+  unit: null
+  null_meaning: always_present
+  description_vi: 'GSM + VinFast: Cờ hoạt động ở CẢ GSM và VinFast trong 12 tháng gần nhất. Luôn có giá trị: FALSE nghĩa là
+    không phải, không phải thiếu dữ liệu.'
+  description_en: 'GSM + VinFast: Flag: active on both GSM and VinFast over the last 12 months. Always populated: FALSE means
+    not applicable, not missing data.'
+  keywords:
+  - active on both gsm and vinfast
+  - ca gsm va vinfast
+  - ca hai don vi
+  - chung
+  - cross bu
+  - cả hai
+  - gsm
+  - gsm + vinfast
+  - hoạt động ở cả gsm và vinfast
+  - hành trình & trạng thái
+  - is cross bu active
+  - is cross bu active l12m
+  - is_cross_bu_active_l12m
+  - khach chung
+  - khach dung ca hai
+  - overlap
+  - vf
+  - vinfast
+  - vua di gsm vua mua vinfast
+  - vừa
+  - xuyen don vi
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: is_cross_bu_active_all
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: boolean
+  aggregation: flag
+  window: all
+  unit: null
+  null_meaning: always_present
+  description_vi: 'GSM + VinFast: Cờ hoạt động ở CẢ GSM và VinFast trong toàn thời gian tính tới ngày snapshot. Luôn có giá
+    trị: FALSE nghĩa là không phải, không phải thiếu dữ liệu.'
+  description_en: 'GSM + VinFast: Flag: active on both GSM and VinFast over the all time up to the snapshot date. Always populated:
+    FALSE means not applicable, not missing data.'
+  keywords:
+  - active on both gsm and vinfast
+  - ca gsm va vinfast
+  - ca hai don vi
+  - chung
+  - cross bu
+  - cả hai
+  - gsm
+  - gsm + vinfast
+  - hoạt động ở cả gsm và vinfast
+  - hành trình & trạng thái
+  - is cross bu active
+  - is cross bu active all
+  - is_cross_bu_active_all
+  - khach chung
+  - khach dung ca hai
+  - overlap
+  - vf
+  - vinfast
+  - vua di gsm vua mua vinfast
+  - vừa
+  - xuyen don vi
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: gsm_spend_l1m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Giá trị & số dư
+  dtype: numeric
+  aggregation: sum
+  window: l1m
+  unit: VND
+  null_meaning: no_history_in_unit
+  description_vi: 'GSM + VinFast: chi tiêu GSM trong 1 tháng gần nhất. NULL nghĩa là khách CHƯA TỪNG có dữ liệu ở đơn vị đó;
+    0 nghĩa là có dữ liệu nhưng kỳ này không phát sinh. Tính trung bình phải chọn rõ mẫu số là nhóm nào.'
+  description_en: 'GSM + VinFast: GSM spend over the last 1 month. NULL means the customer has NEVER had data in that unit;
+    0 means they have history but nothing in this window. Averages must state which denominator they use.'
+  keywords:
+  - chi tiêu gsm
+  - chung
+  - cross bu
+  - cả hai
+  - giá trị & số dư
+  - gsm
+  - gsm + vinfast
+  - gsm spend
+  - gsm spend l1m
+  - gsm_spend_l1m
+  - overlap
+  - vf
+  - vinfast
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: gsm_spend_l3m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Giá trị & số dư
+  dtype: numeric
+  aggregation: sum
+  window: l3m
+  unit: VND
+  null_meaning: no_history_in_unit
+  description_vi: 'GSM + VinFast: chi tiêu GSM trong 3 tháng gần nhất. NULL nghĩa là khách CHƯA TỪNG có dữ liệu ở đơn vị đó;
+    0 nghĩa là có dữ liệu nhưng kỳ này không phát sinh. Tính trung bình phải chọn rõ mẫu số là nhóm nào.'
+  description_en: 'GSM + VinFast: GSM spend over the last 3 months. NULL means the customer has NEVER had data in that unit;
+    0 means they have history but nothing in this window. Averages must state which denominator they use.'
+  keywords:
+  - chi tiêu gsm
+  - chung
+  - cross bu
+  - cả hai
+  - giá trị & số dư
+  - gsm
+  - gsm + vinfast
+  - gsm spend
+  - gsm spend l3m
+  - gsm_spend_l3m
+  - overlap
+  - vf
+  - vinfast
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: gsm_spend_l6m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Giá trị & số dư
+  dtype: numeric
+  aggregation: sum
+  window: l6m
+  unit: VND
+  null_meaning: no_history_in_unit
+  description_vi: 'GSM + VinFast: chi tiêu GSM trong 6 tháng gần nhất. NULL nghĩa là khách CHƯA TỪNG có dữ liệu ở đơn vị đó;
+    0 nghĩa là có dữ liệu nhưng kỳ này không phát sinh. Tính trung bình phải chọn rõ mẫu số là nhóm nào.'
+  description_en: 'GSM + VinFast: GSM spend over the last 6 months. NULL means the customer has NEVER had data in that unit;
+    0 means they have history but nothing in this window. Averages must state which denominator they use.'
+  keywords:
+  - chi tiêu gsm
+  - chung
+  - cross bu
+  - cả hai
+  - giá trị & số dư
+  - gsm
+  - gsm + vinfast
+  - gsm spend
+  - gsm spend l6m
+  - gsm_spend_l6m
+  - overlap
+  - vf
+  - vinfast
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: gsm_spend_l12m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Giá trị & số dư
+  dtype: numeric
+  aggregation: sum
+  window: l12m
+  unit: VND
+  null_meaning: no_history_in_unit
+  description_vi: 'GSM + VinFast: chi tiêu GSM trong 12 tháng gần nhất. NULL nghĩa là khách CHƯA TỪNG có dữ liệu ở đơn vị
+    đó; 0 nghĩa là có dữ liệu nhưng kỳ này không phát sinh. Tính trung bình phải chọn rõ mẫu số là nhóm nào.'
+  description_en: 'GSM + VinFast: GSM spend over the last 12 months. NULL means the customer has NEVER had data in that unit;
+    0 means they have history but nothing in this window. Averages must state which denominator they use.'
+  keywords:
+  - chi tiêu gsm
+  - chung
+  - cross bu
+  - cả hai
+  - giá trị & số dư
+  - gsm
+  - gsm + vinfast
+  - gsm spend
+  - gsm spend l12m
+  - gsm_spend_l12m
+  - overlap
+  - vf
+  - vinfast
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: gsm_spend_all
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Giá trị & số dư
+  dtype: numeric
+  aggregation: sum
+  window: all
+  unit: VND
+  null_meaning: no_history_in_unit
+  description_vi: 'GSM + VinFast: chi tiêu GSM trong toàn thời gian tính tới ngày snapshot. NULL nghĩa là khách CHƯA TỪNG
+    có dữ liệu ở đơn vị đó; 0 nghĩa là có dữ liệu nhưng kỳ này không phát sinh. Tính trung bình phải chọn rõ mẫu số là nhóm
+    nào.'
+  description_en: 'GSM + VinFast: GSM spend over the all time up to the snapshot date. NULL means the customer has NEVER had
+    data in that unit; 0 means they have history but nothing in this window. Averages must state which denominator they use.'
+  keywords:
+  - chi tiêu gsm
+  - chung
+  - cross bu
+  - cả hai
+  - giá trị & số dư
+  - gsm
+  - gsm + vinfast
+  - gsm spend
+  - gsm spend all
+  - gsm_spend_all
+  - overlap
+  - vf
+  - vinfast
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: vinfast_spend_l1m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Giá trị & số dư
+  dtype: numeric
+  aggregation: sum
+  window: l1m
+  unit: VND
+  null_meaning: no_history_in_unit
+  description_vi: 'GSM + VinFast: chi tiêu VinFast trong 1 tháng gần nhất. NULL nghĩa là khách CHƯA TỪNG có dữ liệu ở đơn
+    vị đó; 0 nghĩa là có dữ liệu nhưng kỳ này không phát sinh. Tính trung bình phải chọn rõ mẫu số là nhóm nào.'
+  description_en: 'GSM + VinFast: VinFast spend over the last 1 month. NULL means the customer has NEVER had data in that
+    unit; 0 means they have history but nothing in this window. Averages must state which denominator they use.'
+  keywords:
+  - chi tiêu vinfast
+  - chung
+  - cross bu
+  - cả hai
+  - giá trị & số dư
+  - gsm
+  - gsm + vinfast
+  - overlap
+  - vf
+  - vinfast
+  - vinfast spend
+  - vinfast spend l1m
+  - vinfast_spend_l1m
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: vinfast_spend_l3m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Giá trị & số dư
+  dtype: numeric
+  aggregation: sum
+  window: l3m
+  unit: VND
+  null_meaning: no_history_in_unit
+  description_vi: 'GSM + VinFast: chi tiêu VinFast trong 3 tháng gần nhất. NULL nghĩa là khách CHƯA TỪNG có dữ liệu ở đơn
+    vị đó; 0 nghĩa là có dữ liệu nhưng kỳ này không phát sinh. Tính trung bình phải chọn rõ mẫu số là nhóm nào.'
+  description_en: 'GSM + VinFast: VinFast spend over the last 3 months. NULL means the customer has NEVER had data in that
+    unit; 0 means they have history but nothing in this window. Averages must state which denominator they use.'
+  keywords:
+  - chi tiêu vinfast
+  - chung
+  - cross bu
+  - cả hai
+  - giá trị & số dư
+  - gsm
+  - gsm + vinfast
+  - overlap
+  - vf
+  - vinfast
+  - vinfast spend
+  - vinfast spend l3m
+  - vinfast_spend_l3m
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: vinfast_spend_l6m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Giá trị & số dư
+  dtype: numeric
+  aggregation: sum
+  window: l6m
+  unit: VND
+  null_meaning: no_history_in_unit
+  description_vi: 'GSM + VinFast: chi tiêu VinFast trong 6 tháng gần nhất. NULL nghĩa là khách CHƯA TỪNG có dữ liệu ở đơn
+    vị đó; 0 nghĩa là có dữ liệu nhưng kỳ này không phát sinh. Tính trung bình phải chọn rõ mẫu số là nhóm nào.'
+  description_en: 'GSM + VinFast: VinFast spend over the last 6 months. NULL means the customer has NEVER had data in that
+    unit; 0 means they have history but nothing in this window. Averages must state which denominator they use.'
+  keywords:
+  - chi tiêu vinfast
+  - chung
+  - cross bu
+  - cả hai
+  - giá trị & số dư
+  - gsm
+  - gsm + vinfast
+  - overlap
+  - vf
+  - vinfast
+  - vinfast spend
+  - vinfast spend l6m
+  - vinfast_spend_l6m
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: vinfast_spend_l12m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Giá trị & số dư
+  dtype: numeric
+  aggregation: sum
+  window: l12m
+  unit: VND
+  null_meaning: no_history_in_unit
+  description_vi: 'GSM + VinFast: chi tiêu VinFast trong 12 tháng gần nhất. NULL nghĩa là khách CHƯA TỪNG có dữ liệu ở đơn
+    vị đó; 0 nghĩa là có dữ liệu nhưng kỳ này không phát sinh. Tính trung bình phải chọn rõ mẫu số là nhóm nào.'
+  description_en: 'GSM + VinFast: VinFast spend over the last 12 months. NULL means the customer has NEVER had data in that
+    unit; 0 means they have history but nothing in this window. Averages must state which denominator they use.'
+  keywords:
+  - chi tiêu vinfast
+  - chung
+  - cross bu
+  - cả hai
+  - giá trị & số dư
+  - gsm
+  - gsm + vinfast
+  - overlap
+  - vf
+  - vinfast
+  - vinfast spend
+  - vinfast spend l12m
+  - vinfast_spend_l12m
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: vinfast_spend_all
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Giá trị & số dư
+  dtype: numeric
+  aggregation: sum
+  window: all
+  unit: VND
+  null_meaning: no_history_in_unit
+  description_vi: 'GSM + VinFast: chi tiêu VinFast trong toàn thời gian tính tới ngày snapshot. NULL nghĩa là khách CHƯA TỪNG
+    có dữ liệu ở đơn vị đó; 0 nghĩa là có dữ liệu nhưng kỳ này không phát sinh. Tính trung bình phải chọn rõ mẫu số là nhóm
+    nào.'
+  description_en: 'GSM + VinFast: VinFast spend over the all time up to the snapshot date. NULL means the customer has NEVER
+    had data in that unit; 0 means they have history but nothing in this window. Averages must state which denominator they
+    use.'
+  keywords:
+  - chi tiêu vinfast
+  - chung
+  - cross bu
+  - cả hai
+  - giá trị & số dư
+  - gsm
+  - gsm + vinfast
+  - overlap
+  - vf
+  - vinfast
+  - vinfast spend
+  - vinfast spend all
+  - vinfast_spend_all
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: combined_spend_l1m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Giá trị & số dư
+  dtype: numeric
+  aggregation: sum
+  window: l1m
+  unit: VND
+  null_meaning: no_history_in_unit
+  description_vi: 'GSM + VinFast: tổng chi tiêu cả hai đơn vị trong 1 tháng gần nhất. NULL nghĩa là khách CHƯA TỪNG có dữ
+    liệu ở đơn vị đó; 0 nghĩa là có dữ liệu nhưng kỳ này không phát sinh. Tính trung bình phải chọn rõ mẫu số là nhóm nào.'
+  description_en: 'GSM + VinFast: combined spend across both units over the last 1 month. NULL means the customer has NEVER
+    had data in that unit; 0 means they have history but nothing in this window. Averages must state which denominator they
+    use.'
+  keywords:
+  - ca gsm va vinfast
+  - ca hai don vi
+  - chung
+  - combined spend
+  - combined spend across both units
+  - combined spend l1m
+  - combined_spend_l1m
+  - cross bu
+  - cả hai
+  - giá trị & số dư
+  - gsm
+  - gsm + vinfast
+  - khach chung
+  - khach dung ca hai
+  - overlap
+  - tổng chi tiêu cả hai đơn vị
+  - vf
+  - vinfast
+  - vua di gsm vua mua vinfast
+  - vừa
+  - xuyen don vi
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: combined_spend_l3m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Giá trị & số dư
+  dtype: numeric
+  aggregation: sum
+  window: l3m
+  unit: VND
+  null_meaning: no_history_in_unit
+  description_vi: 'GSM + VinFast: tổng chi tiêu cả hai đơn vị trong 3 tháng gần nhất. NULL nghĩa là khách CHƯA TỪNG có dữ
+    liệu ở đơn vị đó; 0 nghĩa là có dữ liệu nhưng kỳ này không phát sinh. Tính trung bình phải chọn rõ mẫu số là nhóm nào.'
+  description_en: 'GSM + VinFast: combined spend across both units over the last 3 months. NULL means the customer has NEVER
+    had data in that unit; 0 means they have history but nothing in this window. Averages must state which denominator they
+    use.'
+  keywords:
+  - ca gsm va vinfast
+  - ca hai don vi
+  - chung
+  - combined spend
+  - combined spend across both units
+  - combined spend l3m
+  - combined_spend_l3m
+  - cross bu
+  - cả hai
+  - giá trị & số dư
+  - gsm
+  - gsm + vinfast
+  - khach chung
+  - khach dung ca hai
+  - overlap
+  - tổng chi tiêu cả hai đơn vị
+  - vf
+  - vinfast
+  - vua di gsm vua mua vinfast
+  - vừa
+  - xuyen don vi
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: combined_spend_l6m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Giá trị & số dư
+  dtype: numeric
+  aggregation: sum
+  window: l6m
+  unit: VND
+  null_meaning: no_history_in_unit
+  description_vi: 'GSM + VinFast: tổng chi tiêu cả hai đơn vị trong 6 tháng gần nhất. NULL nghĩa là khách CHƯA TỪNG có dữ
+    liệu ở đơn vị đó; 0 nghĩa là có dữ liệu nhưng kỳ này không phát sinh. Tính trung bình phải chọn rõ mẫu số là nhóm nào.'
+  description_en: 'GSM + VinFast: combined spend across both units over the last 6 months. NULL means the customer has NEVER
+    had data in that unit; 0 means they have history but nothing in this window. Averages must state which denominator they
+    use.'
+  keywords:
+  - ca gsm va vinfast
+  - ca hai don vi
+  - chung
+  - combined spend
+  - combined spend across both units
+  - combined spend l6m
+  - combined_spend_l6m
+  - cross bu
+  - cả hai
+  - giá trị & số dư
+  - gsm
+  - gsm + vinfast
+  - khach chung
+  - khach dung ca hai
+  - overlap
+  - tổng chi tiêu cả hai đơn vị
+  - vf
+  - vinfast
+  - vua di gsm vua mua vinfast
+  - vừa
+  - xuyen don vi
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: combined_spend_l12m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Giá trị & số dư
+  dtype: numeric
+  aggregation: sum
+  window: l12m
+  unit: VND
+  null_meaning: no_history_in_unit
+  description_vi: 'GSM + VinFast: tổng chi tiêu cả hai đơn vị trong 12 tháng gần nhất. NULL nghĩa là khách CHƯA TỪNG có dữ
+    liệu ở đơn vị đó; 0 nghĩa là có dữ liệu nhưng kỳ này không phát sinh. Tính trung bình phải chọn rõ mẫu số là nhóm nào.'
+  description_en: 'GSM + VinFast: combined spend across both units over the last 12 months. NULL means the customer has NEVER
+    had data in that unit; 0 means they have history but nothing in this window. Averages must state which denominator they
+    use.'
+  keywords:
+  - ca gsm va vinfast
+  - ca hai don vi
+  - chung
+  - combined spend
+  - combined spend across both units
+  - combined spend l12m
+  - combined_spend_l12m
+  - cross bu
+  - cả hai
+  - giá trị & số dư
+  - gsm
+  - gsm + vinfast
+  - khach chung
+  - khach dung ca hai
+  - overlap
+  - tổng chi tiêu cả hai đơn vị
+  - vf
+  - vinfast
+  - vua di gsm vua mua vinfast
+  - vừa
+  - xuyen don vi
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: combined_spend_all
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Giá trị & số dư
+  dtype: numeric
+  aggregation: sum
+  window: all
+  unit: VND
+  null_meaning: no_history_in_unit
+  description_vi: 'GSM + VinFast: tổng chi tiêu cả hai đơn vị trong toàn thời gian tính tới ngày snapshot. NULL nghĩa là khách
+    CHƯA TỪNG có dữ liệu ở đơn vị đó; 0 nghĩa là có dữ liệu nhưng kỳ này không phát sinh. Tính trung bình phải chọn rõ mẫu
+    số là nhóm nào.'
+  description_en: 'GSM + VinFast: combined spend across both units over the all time up to the snapshot date. NULL means the
+    customer has NEVER had data in that unit; 0 means they have history but nothing in this window. Averages must state which
+    denominator they use.'
+  keywords:
+  - ca gsm va vinfast
+  - ca hai don vi
+  - chung
+  - combined spend
+  - combined spend across both units
+  - combined spend all
+  - combined_spend_all
+  - cross bu
+  - cả hai
+  - giá trị & số dư
+  - gsm
+  - gsm + vinfast
+  - khach chung
+  - khach dung ca hai
+  - overlap
+  - tổng chi tiêu cả hai đơn vị
+  - vf
+  - vinfast
+  - vua di gsm vua mua vinfast
+  - vừa
+  - xuyen don vi
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: dominant_business_unit_l1m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: text
+  aggregation: derived
+  window: l1m
+  unit: null
+  null_meaning: no_spend_to_compare
+  description_vi: 'GSM + VinFast: đơn vị chi tiêu nhiều hơn trong 1 tháng gần nhất. Giá trị: GSM, VINFAST hoặc TIE khi bằng
+    nhau. NULL khi không có chi tiêu ở cả hai đơn vị để so sánh.'
+  description_en: 'GSM + VinFast: business unit with the larger spend over the last 1 month. Values: GSM, VINFAST, or TIE
+    when equal. NULL when there is no spend on either unit to compare.'
+  keywords:
+  - business unit with the larger spend
+  - ca gsm va vinfast
+  - ca hai don vi
+  - chung
+  - cross bu
+  - cả hai
+  - dominant business unit
+  - dominant business unit l1m
+  - dominant_business_unit_l1m
+  - gsm
+  - gsm + vinfast
+  - hành trình & trạng thái
+  - khach chung
+  - khach dung ca hai
+  - overlap
+  - vf
+  - vinfast
+  - vua di gsm vua mua vinfast
+  - vừa
+  - xuyen don vi
+  - xuyên đơn vị
+  - đơn vị chi tiêu nhiều hơn
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: dominant_business_unit_l3m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: text
+  aggregation: derived
+  window: l3m
+  unit: null
+  null_meaning: no_spend_to_compare
+  description_vi: 'GSM + VinFast: đơn vị chi tiêu nhiều hơn trong 3 tháng gần nhất. NULL khi không có chi tiêu ở cả hai đơn
+    vị để so sánh.'
+  description_en: 'GSM + VinFast: business unit with the larger spend over the last 3 months. NULL when there is no spend
+    on either unit to compare.'
+  keywords:
+  - business unit with the larger spend
+  - ca gsm va vinfast
+  - ca hai don vi
+  - chung
+  - cross bu
+  - cả hai
+  - dominant business unit
+  - dominant business unit l3m
+  - dominant_business_unit_l3m
+  - gsm
+  - gsm + vinfast
+  - hành trình & trạng thái
+  - khach chung
+  - khach dung ca hai
+  - overlap
+  - vf
+  - vinfast
+  - vua di gsm vua mua vinfast
+  - vừa
+  - xuyen don vi
+  - xuyên đơn vị
+  - đơn vị chi tiêu nhiều hơn
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: dominant_business_unit_l6m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: text
+  aggregation: derived
+  window: l6m
+  unit: null
+  null_meaning: no_spend_to_compare
+  description_vi: 'GSM + VinFast: đơn vị chi tiêu nhiều hơn trong 6 tháng gần nhất. NULL khi không có chi tiêu ở cả hai đơn
+    vị để so sánh.'
+  description_en: 'GSM + VinFast: business unit with the larger spend over the last 6 months. NULL when there is no spend
+    on either unit to compare.'
+  keywords:
+  - business unit with the larger spend
+  - ca gsm va vinfast
+  - ca hai don vi
+  - chung
+  - cross bu
+  - cả hai
+  - dominant business unit
+  - dominant business unit l6m
+  - dominant_business_unit_l6m
+  - gsm
+  - gsm + vinfast
+  - hành trình & trạng thái
+  - khach chung
+  - khach dung ca hai
+  - overlap
+  - vf
+  - vinfast
+  - vua di gsm vua mua vinfast
+  - vừa
+  - xuyen don vi
+  - xuyên đơn vị
+  - đơn vị chi tiêu nhiều hơn
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: dominant_business_unit_l12m
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: text
+  aggregation: derived
+  window: l12m
+  unit: null
+  null_meaning: no_spend_to_compare
+  description_vi: 'GSM + VinFast: đơn vị chi tiêu nhiều hơn trong 12 tháng gần nhất. NULL khi không có chi tiêu ở cả hai đơn
+    vị để so sánh.'
+  description_en: 'GSM + VinFast: business unit with the larger spend over the last 12 months. NULL when there is no spend
+    on either unit to compare.'
+  keywords:
+  - business unit with the larger spend
+  - ca gsm va vinfast
+  - ca hai don vi
+  - chung
+  - cross bu
+  - cả hai
+  - dominant business unit
+  - dominant business unit l12m
+  - dominant_business_unit_l12m
+  - gsm
+  - gsm + vinfast
+  - hành trình & trạng thái
+  - khach chung
+  - khach dung ca hai
+  - overlap
+  - vf
+  - vinfast
+  - vua di gsm vua mua vinfast
+  - vừa
+  - xuyen don vi
+  - xuyên đơn vị
+  - đơn vị chi tiêu nhiều hơn
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: dominant_business_unit_all
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: text
+  aggregation: derived
+  window: all
+  unit: null
+  null_meaning: no_spend_to_compare
+  description_vi: 'GSM + VinFast: đơn vị chi tiêu nhiều hơn trong toàn thời gian tính tới ngày snapshot. NULL khi không có
+    chi tiêu ở cả hai đơn vị để so sánh.'
+  description_en: 'GSM + VinFast: business unit with the larger spend over the all time up to the snapshot date. NULL when
+    there is no spend on either unit to compare.'
+  keywords:
+  - business unit with the larger spend
+  - ca gsm va vinfast
+  - ca hai don vi
+  - chung
+  - cross bu
+  - cả hai
+  - dominant business unit
+  - dominant business unit all
+  - dominant_business_unit_all
+  - gsm
+  - gsm + vinfast
+  - hành trình & trạng thái
+  - khach chung
+  - khach dung ca hai
+  - overlap
+  - vf
+  - vinfast
+  - vua di gsm vua mua vinfast
+  - vừa
+  - xuyen don vi
+  - xuyên đơn vị
+  - đơn vị chi tiêu nhiều hơn
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: cross_bu_engagement_score
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: numeric
+  aggregation: derived
+  window: null
+  unit: null
+  null_meaning: no_spend_to_compare
+  description_vi: 'GSM + VinFast: mức cân bằng chi tiêu giữa hai đơn vị. Công thức: min(chi tiêu hai đơn vị) / max(chi tiêu
+    hai đơn vị) — 0 là dồn hết một phía, 1 là cân bằng. NULL khi không có chi tiêu ở cả hai đơn vị để so sánh.'
+  description_en: 'GSM + VinFast: cross-BU spend balance score. Formula: min(spend of the two units) / max(spend of the two
+    units) - 0 is one-sided, 1 is balanced. NULL when there is no spend on either unit to compare.'
+  keywords:
+  - ca gsm va vinfast
+  - ca hai don vi
+  - chung
+  - cross bu
+  - cross bu engagement score
+  - cross-bu spend balance score
+  - cross_bu_engagement_score
+  - cả hai
+  - gsm
+  - gsm + vinfast
+  - hành trình & trạng thái
+  - khach chung
+  - khach dung ca hai
+  - mức cân bằng chi tiêu giữa hai đơn vị
+  - overlap
+  - vf
+  - vinfast
+  - vua di gsm vua mua vinfast
+  - vừa
+  - xuyen don vi
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
+  is_active: true
+- name: gsm_active_vehicle_owner_flag
+  table: feature.customer_cross_bu_feature
+  business_unit: CROSS_BU
+  group: Hành trình & trạng thái
+  dtype: boolean
+  aggregation: flag
+  window: null
+  unit: null
+  null_meaning: always_present
+  description_vi: 'GSM + VinFast: Cờ chủ xe VinFast đang hoạt động GSM. Chủ xe chỉ tính từ bản ghi bàn giao, KHÔNG suy từ
+    đơn hoàn tất. Luôn có giá trị: FALSE nghĩa là không phải, không phải thiếu dữ liệu.'
+  description_en: 'GSM + VinFast: Flag: VinFast owner active on GSM. Ownership comes from handover records only, never from
+    order status. Always populated: FALSE means not applicable, not missing data.'
+  keywords:
+  - ban giao xe
+  - buyer
+  - chu xe
+  - chung
+  - chủ sở hữu
+  - chủ xe vinfast đang hoạt động gsm
+  - cross bu
+  - cả hai
+  - da nhan xe
+  - dung ten xe
+  - gsm
+  - gsm + vinfast
+  - gsm active vehicle owner flag
+  - gsm_active_vehicle_owner_flag
+  - hành trình & trạng thái
+  - người mua
+  - overlap
+  - owner
+  - 'owner: chỉ từ bản ghi bàn giao, không suy từ trạng thái đơn.'
+  - so huu xe
+  - vf
+  - vinfast
+  - vinfast owner active on gsm
+  - vừa
+  - xuyên đơn vị
+  - đồng thời
+  support_status: queryable
+  is_queryable: true
   is_active: true

@@ -60,6 +60,38 @@ im lặng — số vẫn "hợp lý" nên không ai phát hiện.
 
 ---
 
+## 1.4 Tại sao không dùng thẳng `status = 'delivered'`?
+
+`raw.vinfast_orders` đã có sẵn `delivered` trong CHECK, và vòng đời thật đúng là:
+
+```
+created → processing → completed → delivered      (hoặc → cancelled)
+```
+
+Nên câu hỏi hợp lý: chưa nhận xe thì đơn ở `completed`, nhận rồi thì `delivered` — cần gì
+bảng handover?
+
+Cần, vì `delivered` trên đơn hàng **thiếu 4 thứ**:
+
+| Thiếu | Hậu quả |
+|---|---|
+| **Mốc thời gian riêng** — chỉ có `updated_at` (trạng thái mới nhất) | Không biết giao ngày nào ⇒ không dựng được snapshot quá khứ |
+| **`vehicle_id`** | Không đếm được số xe; một đơn có thể giao nhiều xe |
+| **Đường đảo ngược** | Trả xe/đổi xe không biểu diễn được — status không lùi |
+| **Grain sự kiện** | Một dòng/đơn, không lưu được lịch sử nhiều lần bàn giao |
+
+`delivered` trả lời "hiện giờ đơn này đã giao chưa". Câu hỏi của Sprint 2 là **"tại ngày D
+khách này có phải chủ xe không"** — cần event log, không phải cột trạng thái.
+
+**Quan hệ giữa hai nguồn (bắt buộc nhất quán):** handover là nguồn sự thật; `delivered` của
+đơn xe được **suy ra** từ nó. Mock generator sinh theo đúng chiều đó, và
+`data_quality_errors()` đỏ nếu có đơn xe `delivered` mà không có bản ghi bàn giao (hoặc ngược lại).
+
+Đơn phụ kiện/dịch vụ vẫn dùng `delivered` bình thường — chúng không có handover, và cũng
+không liên quan tới quyền sở hữu xe.
+
+---
+
 ## 2. Quan hệ bắt buộc (dùng làm invariant test)
 
 ```

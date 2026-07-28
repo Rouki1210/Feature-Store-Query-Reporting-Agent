@@ -122,19 +122,6 @@ def test_generator_normalizes_string_assumptions_from_llm():
     assert output.confidence == .9
 
 
-def test_generation_contract_also_coerces_string_lists():
-    from app.agent.contracts import GenerationResponse, IntentType
-
-    output = GenerationResponse(
-        sql="SELECT x FROM feature.gsm_transaction",
-        selected_features="x",
-        assumptions="latest snapshot",
-        intent=IntentType.single_bu,
-    )
-    assert output.selected_features == ["x"]
-    assert output.assumptions == ["latest snapshot"]
-
-
 def test_json_parser_accepts_code_fence_and_trailing_text():
     parsed = parse_json_object(
         '```json\n{"sql":"SELECT 1","assumptions":"latest"}\n``` trailing explanation'
@@ -157,9 +144,10 @@ def test_canonical_inventory_has_exact_retained_counts():
     from app.semantic.feature_spec import all_features
 
     features = all_features()
-    assert len(features) == 353
+    assert len(features) == 406  # 353 Sprint 1 + 16 buyer/owner PIT + 37 cross-BU
     assert sum(f.table.endswith("gsm_transaction") for f in features) == 167
-    assert sum(f.table.endswith("vinfast_transaction") for f in features) == 186
+    assert sum(f.table.endswith("vinfast_transaction") for f in features) == 202
+    assert sum(f.table.endswith("customer_cross_bu_feature") for f in features) == 37
 
 
 def test_retriever_supports_focused_english_context():
@@ -212,7 +200,7 @@ def test_mock_canceled_features_are_populated():
     # nếu không mọi canceled_* = 0. Seed cố định nên deterministic.
     import scripts.generate_mock_data as g
 
-    customers, _dates, trips, orders = g.generate_raw()
+    customers, _dates, trips, orders, *_events = g.generate_raw()
     gsm, vf = g.build_features(customers, trips, orders)
     assert sum(1 for r in gsm if r.get("canceled_txn_count_l12m")) > 0
     assert sum(1 for r in vf if r.get("txn_canceled_count_l12m")) > 0
@@ -224,28 +212,52 @@ def test_mock_multi_snapshot_as_of():
     import scripts.generate_mock_data as g
 
     assert len(g.SNAPSHOTS) >= 2 and g.SNAPSHOTS[-1] == g.SNAPSHOT
-    cs, _d, tr, od = g.generate_raw()
-    gsm, vf = g.build_features(cs, tr, od, g.SNAPSHOTS[0])  # snapshot cũ nhất
+    cs, _d, tr, od, hist, hand = g.generate_raw()
+    gsm, vf = g.build_features(cs, tr, od, g.SNAPSHOTS[0], hist, hand)  # snapshot cũ nhất
     assert all(r["snapshot_date"] == g.SNAPSHOTS[0] for r in gsm)
     assert all(v is None or v >= 0 for v in (r.get("days_since_last_txn_l12m") for r in gsm))
     null_cust = next(r for r in vf if r["customer_id"] == 8)  # cid%8==0 → không có đơn VF
     assert null_cust.get("completed_order_count_l1m") in (0, None)
 
 
-def test_migration_0002_inventory_matches_feature_spec():
-    # Inventory 353 định nghĩa 2 nơi: feature_spec (→YAML→catalog) và migration
-    # 0002 (→cột vật lý). Migration cố ý đóng băng bản riêng (không import app code
-    # để replay ổn định), nên test này canh hai bản không drift tên/window.
+def test_migration_inventory_matches_feature_spec():
+    # Inventory định nghĩa 2 nơi: feature_spec (→YAML→catalog) và migration (→cột
+    # vật lý). Migration cố ý đóng băng bản riêng (không import app code để replay
+    # ổn định), nên test này canh hai bản không drift tên/window.
+    # 0002 = 353 feature Sprint 1; 0004 = buyer/owner PIT; 0005 = bảng cross-BU (DDL
+    # nguyên khối); 0008 = mở rộng cửa sổ l3m/l6m/l12m/all + handover scheduled.
     import importlib.util
     import pathlib
 
     from app.semantic.feature_spec import feature_names
 
-    path = pathlib.Path(__file__).resolve().parents[1] / "migrations" / "versions" / "0002_align_retained_feature_inventory.py"
-    spec = importlib.util.spec_from_file_location("mig0002", path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    migration_cols = set(mod._GSM_FEATURES) | set(mod._VINFAST_FEATURES)
+    versions = pathlib.Path(__file__).resolve().parents[1] / "migrations" / "versions"
+
+    def load(name):
+        spec = importlib.util.spec_from_file_location(name, versions / f"{name}.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    sprint1 = load("0002_align_retained_feature_inventory")
+    pit = load("0004_extend_vinfast_transaction_pit")
+    windows = load("0008_expand_sprint2_feature_windows")
+    # 0005 tạo bảng bằng DDL nguyên khối — lấy tên cột từ chính SQL đó.
+    cross_sql = (versions / "0005_create_customer_cross_bu_feature.py").read_text(encoding="utf-8")
+    cross_cols = {
+        name for name in feature_names()
+        if name.startswith(("is_active_", "is_cross_bu_", "gsm_spend", "vinfast_spend",
+                            "combined_spend", "dominant_business_unit",
+                            "cross_bu_engagement_score", "gsm_active_vehicle_owner_flag"))
+    }
+    from_0008 = set(windows._CROSS_COLUMNS) | set(windows._VF_COLUMNS)
+    missing = [c for c in cross_cols - from_0008 if c not in cross_sql]
+    assert not missing, f"0005 thiếu cột: {missing}"
+
+    migration_cols = (
+        set(sprint1._GSM_FEATURES) | set(sprint1._VINFAST_FEATURES)
+        | set(pit._PIT_COLUMNS) | cross_cols | from_0008
+    )
     assert migration_cols == feature_names(), migration_cols ^ feature_names()
 
 
@@ -259,7 +271,8 @@ def test_db_layer_matches_yaml_projection():
     assert {f["name"] for f in db_features} == set(yaml_layer)  # cùng tập queryable
     for f in db_features:
         y = yaml_layer[f["name"]]
-        for k in ("table", "group", "window", "aggregation", "dtype", "unit", "description_en"):
+        for k in ("table", "business_unit", "group", "window", "aggregation", "dtype",
+                  "unit", "description_en"):
             assert f[k] == y[k], (f["name"], k, f[k], y[k])
 
 

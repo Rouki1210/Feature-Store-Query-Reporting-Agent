@@ -69,11 +69,6 @@ def test_both_splits_cover_difficulty_and_guardrail():
         assert any(c["expected_status"] == "ok" for c in part), "mỗi split phải có answerable"
 
 
-def test_no_cross_bu_in_benchmark():
-    for c in CASES:
-        assert c.get("expected_business_unit") in (None, "GSM", "VINFAST")
-
-
 def test_holdout_checksum_deterministic():
     from app.eval.golden import holdout_checksum
 

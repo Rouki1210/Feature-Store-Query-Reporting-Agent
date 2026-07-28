@@ -203,7 +203,7 @@ Còn chờ admin: `alembic upgrade head` (0003+0004) → `generate_mock_data` �
 
 ---
 
-## Task 2.4 — Join catalog + Join Planner ✅ code xong, chờ migration 0006
+## Task 2.4 — Join catalog + Join Planner ✅ hoàn tất
 
 **Mục tiêu:** mọi join đều nằm trong danh sách được duyệt; join lạ bị chặn.
 
@@ -211,7 +211,7 @@ Còn chờ admin: `alembic upgrade head` (0003+0004) → `generate_mock_data` �
 `backend/app/agent/join_planner.py` (**một module, không phải package**),
 `backend/scripts/seed_metadata.py`
 
-- [ ] `metadata.join_catalog`:
+- [x] `metadata.join_catalog`:
       ```
       join_id SERIAL PK
       left_table  TEXT, right_table TEXT
@@ -222,18 +222,22 @@ Còn chờ admin: `alembic upgrade head` (0003+0004) → `generate_mock_data` �
       allowed_intents TEXT[]
       is_active   BOOLEAN DEFAULT TRUE
       ```
-- [ ] Seed đúng **1 dòng** lúc đầu: gsm_transaction ⋈ vinfast_transaction, 1:1,
+- [x] Seed đúng **1 dòng** lúc đầu: gsm_transaction ⋈ vinfast_transaction, 1:1,
       keys `[customer_id, snapshot_date]`. Thêm dòng khi có nhu cầu thật.
-- [ ] `join_planner.plan(intent, tables) -> JoinPlan | None`:
+- [x] `join_planner.plan(intent, tables) -> JoinPlan | None`:
       - Nếu câu hỏi cross-BU mà **`customer_cross_bu_feature` phủ được** → trả plan
         "single table", KHÔNG join. Đây là đường mặc định.
       - Chỉ khi cần cột không có trong bảng cross-BU mới tra `join_catalog`.
       - Trả kèm `explanation` tiếng Việt (hiện lên UI).
-- [ ] `tests/test_join_planner.py`: positive (cặp trong catalog) + negative
+- [x] `tests/test_join_planner.py`: positive (cặp trong catalog) + negative
       (bảng ngoài catalog, thiếu `snapshot_date`, `is_active=FALSE`).
 
 **Bỏ bớt:** `configs/join_policy.yaml` — catalog đã ở DB, thêm YAML là 2 nguồn sự thật cho
 cùng 1 thứ. Cấu hình thật (`sql_max_joins`) để trong `config.py` như mọi setting khác.
+
+**Giới hạn đang chủ động giữ:** planner có thể lập plan fallback GSM × VinFast, nhưng pipeline
+chỉ thực thi bảng cross-BU dựng sẵn. Runtime join được log rồi defer tới Task 2.8, nơi AST guard
+enforce join key theo catalog.
 
 ---
 
@@ -242,15 +246,15 @@ cùng 1 thứ. Cấu hình thật (`sql_max_joins`) để trong `config.py` như
 **Đã có:** `app/agent/conversation.py` — TTL, cancel, replace-on-new-question, isolation
 theo `session_id`, 7 test. Chỉ thêm phần Sprint 2 thiếu:
 
-- [ ] Slot tường minh trong `PendingState`: `known_slots` / `missing_slots`
+- [x] Slot tường minh trong `PendingState`: `known_slots` / `missing_slots`
       (`business_unit`, `window`, `top_n`) thay vì chỉ giữ `original_question`.
       Lý do làm bây giờ: 2.6 cần biết **slot nào còn thiếu** để hỏi tiếp, chứ không phải
       nối chuỗi rồi chạy lại mù.
-- [ ] Slot validator: "GSM"/"VF"/"cả hai" → `business_unit`; "3 tháng"/"l3m" → `window`;
+- [x] Slot validator: "GSM"/"VF"/"cả hai" → `business_unit`; "3 tháng"/"l3m" → `window`;
       "top 10" → `top_n`. Trả lời KHÔNG hợp lệ ⇒ **giữ nguyên state**, hỏi lại (đã có test).
-- [ ] Giữ `_STORE` in-memory. **Không thêm Redis** ở sprint này (1 instance, TTL 15 phút,
+- [x] Giữ `_STORE` in-memory. **Không thêm Redis** ở sprint này (1 instance, TTL 15 phút,
       mất state khi restart = user hỏi lại 1 câu). Nợ đã ghi trong `TODO.md`.
-- [ ] Test bổ sung: resolve từng slot một khi thiếu 2 slot (BU rồi window).
+- [x] Test bổ sung: resolve từng slot một khi thiếu 2 slot (BU rồi window).
 
 ---
 
@@ -258,15 +262,15 @@ theo `session_id`, 7 test. Chỉ thêm phần Sprint 2 thiếu:
 
 **File:** `app/agent/conversation.py` + `app/agent/pipeline.py`
 
-- [ ] `pipeline.ask()` nhận thêm `join_plan` (optional) và truyền vào generator context.
-- [ ] Thứ tự xử lý mỗi lượt: check pending → validate slot → merge → **revalidate intent**
+- [x] `pipeline.ask()` nhận thêm `join_plan` (optional) và truyền vào generator context.
+- [x] Thứ tự xử lý mỗi lượt: check pending → validate slot → merge → **revalidate intent**
       (chạy lại router trên text đã merge — hiện đã làm thế, giữ) → retriever →
       join planner nếu intent cross-BU → generator.
-- [ ] Ghi `state_transition` vào `agent.query_log` (cột JSONB, cần
+- [x] Ghi `state_transition` vào `agent.query_log` (cột JSONB, cần
       `ALTER TABLE` trong migration `0006`): `{from, to, resolved_slot}`.
-- [ ] **Không** đẩy toàn bộ chat history vào prompt — chỉ câu đã merge. Giữ nguyên nguyên tắc
+- [x] **Không** đẩy toàn bộ chat history vào prompt — chỉ câu đã merge. Giữ nguyên nguyên tắc
       pipeline stateless.
-- [ ] `tests/test_multi_turn.py`: UC2-01 end-to-end (thiếu BU → hỏi → "GSM" → chạy → state
+- [x] `tests/test_multi_turn.py`: UC2-01 end-to-end (thiếu BU → hỏi → "GSM" → chạy → state
       bị xóa), + cross-BU chỉ chạy khi đủ slot.
 
 ---
@@ -275,16 +279,16 @@ theo `session_id`, 7 test. Chỉ thêm phần Sprint 2 thiếu:
 
 **File:** `app/agent/generator.py`, prompt trong cùng file (đang inline — giữ vậy)
 
-- [ ] Thêm vào prompt: bảng `customer_cross_bu_feature` + **quy tắc buyer ≠ owner**
+- [x] Thêm vào prompt: bảng `customer_cross_bu_feature` + **quy tắc buyer ≠ owner**
       ("`is_vehicle_owner` chỉ từ handover; KHÔNG suy ra từ `status='completed'`").
-- [ ] Truyền `join_plan.explanation` vào context khi có; cấm LLM tự chế join key —
+- [x] Truyền `join_plan.explanation` vào context khi có; cấm LLM tự chế join key —
       validator sẽ chặn, nhưng nói trước ở prompt để giảm vòng repair.
-- [ ] Cho phép CTE (`WITH`) — guard đã chấp nhận `WITH`, kiểm tra lại giới hạn số CTE.
-- [ ] `assumptions` (đã có trong `GenerationResponse`) dùng để trả partial answer:
+- [x] Cho phép CTE (`WITH`) — guard đã chấp nhận `WITH`, kiểm tra lại giới hạn số CTE.
+- [x] `assumptions` (đã có trong `GenerationResponse`) dùng để trả partial answer:
       trả lời được phần nào thì nói rõ phần nào thiếu.
-- [ ] Version prompt: thêm `prompts/CHANGELOG.md` ghi 1 dòng/lần đổi + số eval trước/sau.
+- [x] Version prompt: thêm `prompts/CHANGELOG.md` ghi 1 dòng/lần đổi + số eval trước/sau.
       **Đây là file duy nhất đáng thêm** trong nhóm "prompt versioning" của tracker.
-- [ ] Regression: toàn bộ 40 case dev của Sprint 1 phải giữ nguyên kết quả.
+- [x] Regression: toàn bộ 40 case dev của Sprint 1 phải giữ nguyên kết quả.
 
 ---
 
@@ -292,16 +296,16 @@ theo `session_id`, 7 test. Chỉ thêm phần Sprint 2 thiếu:
 
 **File:** `app/sql/guards.py` (đã là AST `sqlglot` — đúng nền để làm tiếp), `app/config.py`
 
-- [ ] Thêm `feature.customer_cross_bu_feature` vào `_FEATURE_TABLES` (nợ đã ghi trong `TODO.md`).
-- [ ] Từ AST, trích mọi `exp.Join` → so với `join_catalog`:
+- [x] Thêm `feature.customer_cross_bu_feature` vào `_FEATURE_TABLES` (nợ đã ghi trong `TODO.md`).
+- [x] Từ AST, trích mọi `exp.Join` → so với `join_catalog`:
       - cặp bảng không có trong catalog ⇒ reject;
       - điều kiện join thiếu `snapshot_date` ⇒ reject;
       - `JOIN` không có `ON` (Cartesian) ⇒ reject.
-- [ ] `sql_max_joins` (mặc định 2) vào `config.py`.
-- [ ] `statement_timeout` đã enforce ở `executor._prepare_query_connection` — chỉ thêm test
+- [x] `sql_max_joins` (mặc định 2) vào `config.py`.
+- [x] `statement_timeout` đã enforce ở `executor._prepare_query_connection` — chỉ thêm test
       là query chậm bị cắt, không viết lại.
-- [ ] Log mọi lần reject vào `agent.sql_validation_log` (đã có bảng).
-- [ ] `tests/test_sql_validator_v2.py` — adversarial, mỗi case 1 dòng:
+- [x] Log mọi lần reject vào `agent.sql_validation_log` (đã có bảng).
+- [x] `tests/test_guards.py` — adversarial runtime-join cases:
       join theo mỗi `customer_id`; `CROSS JOIN`; join `raw.*`; join 3 bảng;
       subquery lồng chạm `raw`; UNION với bảng ngoài allowlist.
 

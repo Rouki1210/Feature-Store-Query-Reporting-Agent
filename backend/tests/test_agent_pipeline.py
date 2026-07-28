@@ -6,6 +6,7 @@ from app.agent.narrator import OptionalLLMNarrator
 from app.agent.contracts import NarrationInput
 from app.models.schemas import QueryResult
 from app.agent.pipeline import AgentPipeline
+from app.agent.join_planner import JoinPlanner
 from app.agent.router import RuleRouter, normalize_question
 
 
@@ -17,13 +18,6 @@ def test_normalize_rejects_empty_and_preserves_text():
     original, normalized = normalize_question("  GSM   trips  ")
     assert original == "GSM   trips"
     assert normalized == "gsm trips"
-
-
-def test_router_refuses_owner_without_llm():
-    router = RuleRouter()
-    _, decision = router.route("Khách nào là chủ sở hữu xe?")
-    assert decision.intent.value == "out_of_scope"
-    assert decision.refusal_code.value == "vehicle_owner"
 
 
 def test_router_refuses_raw_without_llm():
@@ -45,15 +39,34 @@ def test_pipeline_runs_valid_feature_query():
     assert response.sql and "feature.gsm_transaction" in response.sql
 
 
-def test_pipeline_refusal_does_not_call_llm():
+def test_pipeline_allows_owner_feature_query():
     client = StaticJSONClient({
-        "sql": "SELECT customer_id FROM feature.gsm_transaction",
-        "selected_features": ["completed_txn_count_l1m"],
+        "sql": (
+            "SELECT customer_id, is_vehicle_owner FROM feature.vinfast_transaction "
+            "WHERE is_vehicle_owner ORDER BY customer_id"
+        ),
+        "selected_features": ["is_vehicle_owner"],
         "intent": "single_bu",
     })
-    response = _pipeline(client.payload).ask("Khách nào là owner xe VinFast?")
-    assert response.status == "out_of_scope"
-    assert client.calls == []
+    response = AgentPipeline(SQLGenerator(client)).ask("Khách nào là owner xe VinFast?")
+    assert response.status == "ok"
+    assert client.calls
+
+
+def test_pipeline_runs_cross_bu_from_precomputed_table():
+    client = StaticJSONClient({
+        "sql": (
+            "SELECT COUNT(is_cross_bu_active_l1m) AS customer_count "
+            "FROM feature.customer_cross_bu_feature"
+        ),
+        "selected_features": ["is_cross_bu_active_l1m"],
+        "intent": "cross_bu",
+    })
+    pipeline = AgentPipeline(SQLGenerator(client), join_planner=JoinPlanner())
+    response = pipeline.ask("Bao nhiêu khách hoạt động GSM và đồng thời có đơn VinFast l1m?")
+    assert response.status == "ok"
+    assert response.join_explanation and "tính sẵn" in response.join_explanation
+    assert "feature.customer_cross_bu_feature" in (response.sql or "")
 
 
 def test_pipeline_clarifies_on_ambiguous_question_without_calling_llm():
@@ -120,6 +133,36 @@ def test_generator_normalizes_string_assumptions_from_llm():
     assert output.selected_features == ["completed_txn_count_l1m"]
     assert output.assumptions == ["Dùng snapshot mới nhất."]
     assert output.confidence == .9
+
+
+def test_pipeline_executes_catalog_backed_runtime_join():
+    from app.agent.contracts import IntentType, RouteDecision
+    from app.semantic.retriever import ScoredFeature
+
+    class CrossRouter:
+        def route(self, question, _max_chars):
+            return question, RouteDecision(intent=IntentType.cross_bu, business_unit="CROSS_BU", confidence=1)
+
+    class RuntimeJoinLayer:
+        def retrieve(self, _question, business_unit=None):
+            assert business_unit == "CROSS_BU"
+            return [
+                ScoredFeature("completed_txn_count_l1m", "feature.gsm_transaction", "usage", "", "", [], 5),
+                ScoredFeature("txn_completed_count_l1m", "feature.vinfast_transaction", "usage", "", "", [], 5),
+            ]
+
+    client = StaticJSONClient({
+        "sql": "SELECT g.customer_id, g.completed_txn_count_l1m, v.txn_completed_count_l1m "
+               "FROM feature.gsm_transaction g INNER JOIN feature.vinfast_transaction v "
+               "ON g.customer_id = v.customer_id AND g.snapshot_date = v.snapshot_date ORDER BY g.customer_id",
+        "selected_features": ["completed_txn_count_l1m", "txn_completed_count_l1m"],
+        "intent": "cross_bu", "confidence": .9,
+    })
+    response = AgentPipeline(
+        SQLGenerator(client), router=CrossRouter(), semantic_layer=RuntimeJoinLayer(), join_planner=JoinPlanner(),
+    ).ask("compare GSM and VinFast")
+    assert response.status == "ok"
+    assert "INNER JOIN" in (response.sql or "").upper()
 
 
 def test_json_parser_accepts_code_fence_and_trailing_text():

@@ -9,6 +9,7 @@ from sqlalchemy import text
 from app.agent.context import generation_request
 from app.agent.contracts import IntentType, NarrationInput, PipelineContext, RepairRequest
 from app.agent.generator import SQLGenerator
+from app.agent.join_planner import JoinPlan, JoinPlanner
 from app.agent.narrator import deterministic_answer
 from app.agent.router import RuleRouter
 from app.agent.validator import PipelineValidator
@@ -29,6 +30,7 @@ class AgentPipeline:
         settings: Settings | None = None,
         semantic_layer=None,
         narrator: Callable[[NarrationInput], str] | None = None,
+        join_planner: JoinPlanner | None = None,
     ):
         self.settings = settings or get_settings()
         self.generator = generator
@@ -36,8 +38,12 @@ class AgentPipeline:
         self.validator = validator or PipelineValidator()
         self.semantic_layer = semantic_layer or get_semantic_layer()
         self.narrator = narrator
+        self.join_planner = join_planner
 
-    def ask(self, question: str, session_id: str | None = None) -> AskResponse:
+    def ask(
+        self, question: str, session_id: str | None = None, *,
+        join_plan: JoinPlan | None = None, state_transition: dict | None = None,
+    ) -> AskResponse:
         started = time.perf_counter()
         trace: list[dict[str, Any]] = []
 
@@ -71,13 +77,16 @@ class AgentPipeline:
             original_question=original, normalized_question=normalized, route=route
         )
         if route.intent in (IntentType.out_of_scope, IntentType.clarify):
-            self._audit_terminal(original, route, session_id, int((time.perf_counter() - started) * 1000))
+            self._audit_terminal(
+                original, route, session_id, int((time.perf_counter() - started) * 1000),
+                state_transition=state_transition,
+            )
             return AskResponse(
                 status="out_of_scope" if route.intent == IntentType.out_of_scope else "clarify",
                 answer_vi=route.reason, clarifying_question=route.clarifying_question,
                 confidence=Confidence.high if route.confidence >= 0.9 else Confidence.medium,
                 refusal_code=route.refusal_code.value if route.refusal_code else None,
-                pipeline_trace=trace,
+                pipeline_trace=trace, known_slots=route.known_slots, missing_slots=route.missing_slots,
             )
         retrieval_started = time.perf_counter()
         scored = self.semantic_layer.retrieve(
@@ -91,13 +100,51 @@ class AgentPipeline:
             mark("retriever", "app.semantic.retriever.SemanticLayer", reason, original,
                  [{"name": f.name, "score": f.score} for f in scored[:3]], retrieval_ms)
             route.intent = IntentType.clarify
+            # Đừng hỏi lại slot đã biết: router gán được BU rồi thì chỉ còn thiếu chỉ số
+            # và cửa sổ. Hỏi lại thứ user vừa nói là cách nhanh nhất để họ bỏ cuộc.
+            route.missing_slots = [
+                s for s in ("business_unit", "window") if s not in route.known_slots
+            ] or ["window"]
             route.clarifying_question = "Câu hỏi chưa đủ rõ để chọn đúng chỉ số. Bạn muốn xem chỉ số nào (số chuyến, chi tiêu, tỷ lệ hủy...), của GSM hay VinFast, trong khoảng thời gian nào?"
-            self._audit_terminal(original, route, session_id, int((time.perf_counter() - started) * 1000))
-            return AskResponse(status="clarify", clarifying_question=route.clarifying_question, pipeline_trace=trace)
+            self._audit_terminal(
+                original, route, session_id, int((time.perf_counter() - started) * 1000),
+                state_transition=state_transition,
+            )
+            return AskResponse(
+                status="clarify", clarifying_question=route.clarifying_question, pipeline_trace=trace,
+                known_slots=route.known_slots, missing_slots=route.missing_slots,
+            )
         mark("retriever", "app.semantic.retriever.SemanticLayer", "completed", original,
              [{"name": f.name, "table": f.table, "score": f.score} for f in scored], retrieval_ms)
         context.retrieved = [f.__dict__ for f in scored]
-        req = generation_request(original, route, scored)
+        plan_dict: dict | None = None
+        join_rules = ()
+        if route.intent == IntentType.cross_bu:
+            try:
+                if self.join_planner is None:
+                    self.join_planner = JoinPlanner.load_from_db(self.settings.sql_max_joins)
+                decision = self.join_planner.plan_for_features(route.intent.value, scored)
+            except Exception as exc:
+                reason = "Không đọc được join catalog để lập kế hoạch cross-BU."
+                self._audit_terminal(
+                    original, route, session_id, int((time.perf_counter() - started) * 1000), reason,
+                    state_transition=state_transition,
+                )
+                return AskResponse(status="error", error=reason, pipeline_trace=trace)
+            plan = join_plan or decision.plan
+            if plan is None:
+                self._audit_terminal(
+                    original, route, session_id, int((time.perf_counter() - started) * 1000), decision.reason_vi,
+                    state_transition=state_transition,
+                )
+                return AskResponse(status="out_of_scope", answer_vi=decision.reason_vi, pipeline_trace=trace)
+            if join_plan and not set(join_plan.tables) <= {f.table for f in scored}:
+                return AskResponse(status="error", error="Join plan không khớp feature đã retrieve.", pipeline_trace=trace)
+            plan_dict = plan.as_dict()
+            join_rules = self.join_planner.rules
+            mark("join_planner", "app.agent.join_planner.JoinPlanner", "completed",
+                 {"intent": route.intent.value}, plan_dict)
+        req = generation_request(original, route, scored, plan_dict)
         allowed = {f.name for f in scored}
         generation_started = time.perf_counter()
         try:
@@ -114,7 +161,9 @@ class AgentPipeline:
              int((time.perf_counter() - generation_started) * 1000))
         repairs = 0
         while True:
-            validation = self.validator.validate(generation, allowed, self.settings)
+            validation = self.validator.validate(
+                generation, allowed, self.settings, join_plan=plan_dict, join_rules=join_rules,
+            )
             mark("validator", "app.agent.validator.PipelineValidator",
                  "valid" if validation.valid else "rejected",
                  {"sql": generation.sql, "selected_features": generation.selected_features},
@@ -141,6 +190,7 @@ class AgentPipeline:
                 request=RepairRequest(
                     question=original, previous_sql=generation.sql,
                     error="; ".join(validation.errors), feature_context=req.feature_context,
+                    join_plan=plan_dict,
                 ),
                 intent=route.intent,
             )
@@ -151,6 +201,7 @@ class AgentPipeline:
             safe_sql, result = run_query(
                 validation.sql or generation.sql, self.settings,
                 query_text=original, session_id=session_id,
+                join_plan=plan_dict, join_rules=join_rules, state_transition=state_transition,
             )
             mark("executor", "app.sql.executor.run_query", "completed",
                  {"sql": safe_sql}, {"columns": result.columns, "row_count": result.row_count,
@@ -167,20 +218,25 @@ class AgentPipeline:
                 generation = self.generator.repair(
                     RepairRequest(
                         question=original, previous_sql=generation.sql,
-                        error=str(exc), feature_context=req.feature_context,
+                        error=str(exc), feature_context=req.feature_context, join_plan=plan_dict,
                     ), route.intent,
                 )
                 mark("repair", "app.agent.generator.SQLGenerator.repair", "completed", None, None,
                      int((time.perf_counter() - repair_started) * 1000))
-                validation = self.validator.validate(generation, allowed, self.settings)
+                validation = self.validator.validate(
+                    generation, allowed, self.settings, join_plan=plan_dict, join_rules=join_rules,
+                )
                 mark("validator", "app.agent.validator.PipelineValidator",
                      "valid" if validation.valid else "rejected",
                      {"sql": generation.sql}, validation.model_dump(mode="json"))
                 if validation.valid:
                     execution_started = time.perf_counter()
                     try:
-                        safe_sql, result = run_query(validation.sql or generation.sql, self.settings,
-                                                     query_text=original, session_id=session_id)
+                        safe_sql, result = run_query(
+                            validation.sql or generation.sql, self.settings,
+                            query_text=original, session_id=session_id,
+                            join_plan=plan_dict, join_rules=join_rules, state_transition=state_transition,
+                        )
                     except Exception as final_exc:
                         self._audit_terminal(
                             original, route, session_id, int((time.perf_counter() - started) * 1000),
@@ -228,23 +284,30 @@ class AgentPipeline:
             status="ok", answer_vi=answer, sql=safe_sql, result=result, retrieved=retrieved,
             confidence=Confidence.high if generation.confidence >= .8 else Confidence.medium,
             coverage=coverage, repairs=repairs, pipeline_trace=trace,
+            join_explanation=plan_dict and plan_dict.get("explanation_vi"),
         )
 
     @staticmethod
-    def _audit_terminal(question, route, session_id, elapsed_ms, error=None, generated_sql=None, validation_errors=None):
+    def _audit_terminal(
+        question, route, session_id, elapsed_ms, error=None, generated_sql=None, validation_errors=None,
+        state_transition=None, join_plan=None,
+    ):
         try:
             with get_engine().begin() as conn:
                 query_id = conn.execute(text("""
                     INSERT INTO agent.query_log
                       (session_id, query_text, detected_intent, generated_sql, execution_status,
-                       execution_time_ms, error_message)
-                    VALUES (:session, :question, :intent, :sql, :status, :ms, :error)
+                       execution_time_ms, error_message, join_plan, state_transition)
+                    VALUES (:session, :question, :intent, :sql, :status, :ms, :error,
+                            CAST(:plan AS jsonb), CAST(:transition AS jsonb))
                     RETURNING query_id
                 """), {
                     "session": session_id, "question": question,
                     "intent": route.intent.value,
                     "status": "rejected" if route.intent == IntentType.out_of_scope else "clarification_required",
                     "sql": generated_sql, "ms": elapsed_ms, "error": error or route.reason,
+                    "plan": json.dumps(join_plan) if join_plan else None,
+                    "transition": json.dumps(state_transition) if state_transition else None,
                 }).scalar_one()
                 if generated_sql is not None:
                     conn.execute(text("""

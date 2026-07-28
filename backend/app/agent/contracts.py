@@ -9,6 +9,7 @@ from app.models.schemas import QueryResult
 
 
 class IntentType(str, Enum):
+    cross_bu = "cross_bu"
     single_bu = "single_bu"
     aggregate = "aggregate"
     filter = "filter"
@@ -33,12 +34,15 @@ class RouteDecision(BaseModel):
     reason: str = ""
     refusal_code: RefusalCode | None = None
     clarifying_question: str | None = None
+    known_slots: dict[str, str | int] = Field(default_factory=dict)
+    missing_slots: list[str] = Field(default_factory=list)
 
 
 class GenerationRequest(BaseModel):
     question: str
     route: RouteDecision
     feature_context: str
+    join_plan: dict[str, Any] | None = None
 
 
 class GenerationResponse(BaseModel):
@@ -81,6 +85,7 @@ class RepairRequest(BaseModel):
     previous_sql: str
     error: str
     feature_context: str
+    join_plan: dict[str, Any] | None = None
 
 
 class NarrationInput(BaseModel):

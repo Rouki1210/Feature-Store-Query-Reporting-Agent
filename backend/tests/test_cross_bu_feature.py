@@ -225,6 +225,9 @@ def test_owner_question_ranks_owner_above_buyer():
     hits = [f.name for f in layer.retrieve("Bao nhiêu khách đang là chủ xe VinFast", top_k=3)]
     assert hits[0] == "is_vehicle_owner"
 
+    delivered = layer.retrieve("Đã có bao nhiêu khách nhận xe trong tháng trước", business_unit="VINFAST", top_k=1)
+    assert delivered[0].name == "vehicle_delivered_count_l1m"
+
 
 def test_money_question_does_not_return_boolean_flags():
     """Cờ boolean không phải câu trả lời cho câu hỏi về tiền."""
@@ -248,6 +251,25 @@ def test_cross_bu_business_unit_routes_to_cross_bu_table():
     hits = layer.retrieve("khách dùng cả hai đơn vị chi tiêu bao nhiêu", business_unit="CROSS_BU")
     assert hits
     assert all("cross_bu" in h.table for h in hits)
+
+
+def test_cross_bu_routing_does_not_need_keyword_hint():
+    """Router đã gán CROSS_BU thì retrieval không được đòi thêm từ khóa 'cả hai'.
+
+    Hai điều kiện cộng dồn từng làm UC2-03 ("Khách GSM nào đang là chủ xe VinFast")
+    trả về 0 feature, rồi agent báo "câu hỏi chưa đủ rõ" — trong khi câu hỏi rất rõ.
+    """
+    from app.semantic.retriever import SemanticLayer
+
+    layer = SemanticLayer.load("data/semantic_layer.yaml")
+    for question in (
+        "Khách GSM nào đang là chủ xe VinFast",
+        "So sánh chi tiêu GSM và VinFast của từng khách trong 1 tháng",
+        "Chi tiêu GSM của nhóm chủ xe VinFast 1 tháng",
+    ):
+        hits = layer.retrieve(question, business_unit="CROSS_BU")
+        assert hits, question
+        assert all("cross_bu" in h.table for h in hits)
 
 
 def test_vinfast_unit_excludes_cross_bu_features():

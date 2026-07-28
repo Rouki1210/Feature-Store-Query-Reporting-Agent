@@ -15,8 +15,13 @@ from app.sql.guards import GuardError, validate_sql
 
 DIFFICULTY = {"easy", "medium", "hard"}
 CATEGORY = {
+    # Sprint 1
     "single_feature", "time_comparison", "service_breakdown", "ambiguous_question",
     "out_of_scope", "restricted_data", "sql_safety",
+    # Sprint 2 — docs/sprint2_definition_of_done.md §3.
+    # `multi_turn` CỐ Ý không có ở đây: evaluator gọi thẳng pipeline (stateless), đo
+    # hội thoại phải qua `ask_with_context` nên nằm ở tests/test_multi_turn.py.
+    "cross_bu", "buyer_vs_owner", "point_in_time", "join_safety",
 }
 STATUS = {"ok", "clarify", "out_of_scope", "error"}
 REFUSAL = {c.value for c in RefusalCode} | {None}

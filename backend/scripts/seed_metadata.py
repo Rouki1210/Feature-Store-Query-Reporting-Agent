@@ -125,7 +125,7 @@ def seed_join_catalog() -> int:
                 "left": rule.left_table, "right": rule.right_table,
                 "keys": list(rule.join_keys), "type": rule.join_type,
                 "card": rule.cardinality, "snap": rule.requires_snapshot_key,
-                "intents": ["cross_bu"], "why": rule.explanation_vi,
+                "intents": list(rule.allowed_intents), "why": rule.explanation_vi,
             })
     return len(DEFAULT_RULES)
 

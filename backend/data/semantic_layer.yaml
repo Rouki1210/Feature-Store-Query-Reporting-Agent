@@ -10855,9 +10855,12 @@ features:
   description_en: 'VinFast: Delivered Vehicle Count over the last 1 month. NULL when no event exists in the window.'
   keywords:
   - car
+  - da ban giao xe
   - delivered vehicle count
   - giao dịch
   - hoạt động & tần suất
+  - khach nhan xe
+  - nhan xe
   - order
   - số xe đã bàn giao
   - vehicle
@@ -10866,6 +10869,7 @@ features:
   - vehicle_delivered_count_l1m
   - vf
   - vinfast
+  - xe da nhan
   - đơn xe
   support_status: queryable
   is_queryable: true
@@ -10883,9 +10887,12 @@ features:
   description_en: 'VinFast: Delivered Vehicle Count over the last 3 months. NULL when no event exists in the window.'
   keywords:
   - car
+  - da ban giao xe
   - delivered vehicle count
   - giao dịch
   - hoạt động & tần suất
+  - khach nhan xe
+  - nhan xe
   - order
   - số xe đã bàn giao
   - vehicle
@@ -10894,6 +10901,7 @@ features:
   - vehicle_delivered_count_l3m
   - vf
   - vinfast
+  - xe da nhan
   - đơn xe
   support_status: queryable
   is_queryable: true
@@ -10911,9 +10919,12 @@ features:
   description_en: 'VinFast: Delivered Vehicle Count over the last 6 months. NULL when no event exists in the window.'
   keywords:
   - car
+  - da ban giao xe
   - delivered vehicle count
   - giao dịch
   - hoạt động & tần suất
+  - khach nhan xe
+  - nhan xe
   - order
   - số xe đã bàn giao
   - vehicle
@@ -10922,6 +10933,7 @@ features:
   - vehicle_delivered_count_l6m
   - vf
   - vinfast
+  - xe da nhan
   - đơn xe
   support_status: queryable
   is_queryable: true
@@ -10939,9 +10951,12 @@ features:
   description_en: 'VinFast: Delivered Vehicle Count over the last 12 months. NULL when no event exists in the window.'
   keywords:
   - car
+  - da ban giao xe
   - delivered vehicle count
   - giao dịch
   - hoạt động & tần suất
+  - khach nhan xe
+  - nhan xe
   - order
   - số xe đã bàn giao
   - vehicle
@@ -10950,6 +10965,7 @@ features:
   - vehicle_delivered_count_l12m
   - vf
   - vinfast
+  - xe da nhan
   - đơn xe
   support_status: queryable
   is_queryable: true
@@ -10969,9 +10985,12 @@ features:
     the window.'
   keywords:
   - car
+  - da ban giao xe
   - delivered vehicle count
   - giao dịch
   - hoạt động & tần suất
+  - khach nhan xe
+  - nhan xe
   - order
   - số xe đã bàn giao
   - vehicle
@@ -10980,6 +10999,7 @@ features:
   - vehicle_delivered_count_all
   - vf
   - vinfast
+  - xe da nhan
   - đơn xe
   support_status: queryable
   is_queryable: true
@@ -11047,6 +11067,7 @@ features:
   - is_vehicle_owner
   - khách đang là chủ xe
   - người mua
+  - nhan xe
   - order
   - owner
   - 'owner: chỉ từ bản ghi bàn giao, không suy từ trạng thái đơn.'
@@ -11147,6 +11168,7 @@ features:
   - first_vehicle_handover_date
   - giao dịch
   - ngày nhận xe đầu tiên
+  - nhan xe
   - order
   - 'owner: chỉ từ bản ghi bàn giao, không suy từ trạng thái đơn.'
   - so huu xe
@@ -11183,6 +11205,7 @@ features:
   - giao dịch
   - lan cuoi
   - lau khong su dung
+  - nhan xe
   - order
   - 'owner: chỉ từ bản ghi bàn giao, không suy từ trạng thái đơn.'
   - so huu xe
@@ -12543,6 +12566,7 @@ features:
   - gsm_active_vehicle_owner_flag
   - hành trình & trạng thái
   - người mua
+  - nhan xe
   - overlap
   - owner
   - 'owner: chỉ từ bản ghi bàn giao, không suy từ trạng thái đơn.'

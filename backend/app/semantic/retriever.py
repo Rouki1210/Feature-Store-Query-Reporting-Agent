@@ -29,7 +29,10 @@ _WINDOW_ALIASES = {
     "l1w": ("l1w", "1 tuần", "1 tuan", "tuần gần nhất", "last 1 week", "last week"),
     "l2w": ("l2w", "2 tuần", "2 tuan", "last 2 weeks"),
     "l4w": ("l4w", "4 tuần", "4 tuan", "last 4 weeks"),
-    "l1m": ("l1m", "1 tháng", "1 thang", "tháng gần nhất", "last 1 month", "last month"),
+    "l1m": (
+        "l1m", "1 tháng", "1 thang", "tháng gần nhất", "tháng trước", "thang truoc",
+        "last 1 month", "last month",
+    ),
     "l2m": ("l2m", "2 tháng", "2 thang", "last 2 months"),
     "l3m": ("l3m", "3 tháng", "3 thang", "last 3 months"),
     "l6m": ("l6m", "6 tháng", "6 thang", "last 6 months"),
@@ -85,6 +88,7 @@ class ScoredFeature:
     dtype: str | None = None
     unit: str | None = None
     null_meaning: str | None = None
+    business_unit: str | None = None
 
 
 class SemanticLayer:
@@ -277,9 +281,13 @@ class SemanticLayer:
             # đúng cái nhầm mà cả Sprint 2 dựng ra để tránh.
             is_cross = table == "customer_cross_bu_feature"
             if is_cross or f.get("aggregation") == "flag":
-                # Cross-BU phải có tín hiệu "cả hai đơn vị" mới được vào, tránh lọt
-                # vào câu single-BU. Cờ ở bảng BU thì không cần điều kiện đó.
-                if is_cross and not table_scores.get(table):
+                # Khi router ĐÃ định tuyến cross_bu (unit == CROSS_BU) thì không đòi
+                # thêm từ khóa "cả hai/đồng thời" nữa — hai điều kiện cộng dồn từng
+                # làm "Khách GSM nào đang là chủ xe VinFast" trả về 0 feature rồi
+                # báo "câu hỏi chưa đủ rõ", trong khi câu hỏi rất rõ.
+                # Gate từ khóa chỉ còn cần khi CHƯA biết BU, để cross-BU không lọt
+                # vào câu single-BU.
+                if is_cross and unit is None and not table_scores.get(table):
                     continue
                 # Cờ boolean không bao giờ là câu trả lời cho câu hỏi về TIỀN.
                 if f.get("aggregation") == "flag" and metric_hint == "value":
@@ -374,6 +382,7 @@ class SemanticLayer:
                     dtype=f.get("dtype"),
                     unit=f.get("unit"),
                     null_meaning=f.get("null_meaning"),
+                    business_unit=f.get("business_unit"),
                 )
             )
         scored.sort(key=lambda item: (-item.score, item.name))

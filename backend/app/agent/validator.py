@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from typing import Any, Iterable
 
 from app.agent.contracts import GenerationResponse, ValidationResult
 from app.semantic.feature_spec import feature_names
@@ -48,6 +49,9 @@ class PipelineValidator:
         generation: GenerationResponse,
         allowed_features: set[str],
         settings=None,
+        *,
+        join_plan: dict[str, Any] | None = None,
+        join_rules: Iterable[Any] = (),
     ) -> ValidationResult:
         errors: list[str] = []
         unknown = sorted(set(generation.selected_features) - allowed_features)
@@ -59,7 +63,9 @@ class PipelineValidator:
                 f"Feature outside canonical Sprint 1 inventory: {', '.join(noncanonical)}"
             )
         try:
-            safe_sql = validate_sql(generation.sql, settings)
+            safe_sql = validate_sql(
+                generation.sql, settings, join_plan=join_plan, join_rules=join_rules,
+            )
         except GuardError as exc:
             errors.append(str(exc))
             return ValidationResult(

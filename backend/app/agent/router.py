@@ -32,13 +32,27 @@ def _hit(q: str, terms: tuple[str, ...]) -> bool:
     return False
 
 
+# Chỉ liệt kê cửa sổ mà `conversation._answer_slots` thật sự parse được — hỏi một
+# lựa chọn rồi từ chối chính câu trả lời đó là cách nhanh nhất để user bỏ cuộc.
+_WINDOW_QUESTION = (
+    "Bạn muốn xem trong khoảng nào: 1 tuần, 1 tháng, 3 tháng, 6 tháng, 12 tháng, "
+    "hay tổng cộng từ trước đến nay?"
+)
+
+
 class RuleRouter:
-    _vehicle_handover = ("bàn giao", "handover")
     _loyalty = ("loyalty", "vinclub")
     _window = ("daily", "l1w", "l2w", "l1m", "l2m", "l3m", "l6m", "l12m", "hôm nay", "ngày", "tuần", "tháng", "month", "week")
     _windowed_metric = ("số chuyến", "số đơn", "hoàn thành", "completed", "bị hủy", "canceled", "chi tiêu", "giá trị", "quãng đường", "hoạt động")
     _cross = ("cross pnl", "liên pnl", "chéo ngành", "chuyển dịch giữa", "earn", "burn", "loyalty", "vinclub")
-    _owner = ("owner", "ownership", "sở hữu xe", "đứng tên xe", "chủ xe")
+    _owner = (
+        "owner", "ownership", "sở hữu xe", "đứng tên xe", "chủ xe",
+        "nhận xe", "bàn giao xe",
+    )
+    _cross_bu = (
+        "cả hai", "ca hai", "đồng thời", "dong thoi", "overlap", "khách chung",
+        "khach chung", "vừa đi gsm vừa mua vinfast", "vua di gsm vua mua vinfast",
+    )
     # 'raw' word-boundary phủ cả raw. / raw data / raw table.
     _raw_pii = ("raw", "pii", "số điện thoại", "phone", "email", "cccd", "địa chỉ", "họ tên", "customer name")
     _out_catalog = ("vinhomes", "vinmec", "vinpearl", "vinschool", "vinclub")
@@ -71,23 +85,11 @@ class RuleRouter:
                 reason="Loyalty/VinClub không thuộc catalog Sprint 1.",
                 refusal_code=RefusalCode.out_of_catalog,
             )
-        if _hit(q, self._vehicle_handover):
-            return original, RouteDecision(
-                intent=IntentType.out_of_scope, confidence=0.99,
-                reason="Không được suy diễn vehicle handover từ dữ liệu giao dịch.",
-                refusal_code=RefusalCode.vehicle_owner,
-            )
         if _hit(q, self._cross):
             return original, RouteDecision(
                 intent=IntentType.out_of_scope, confidence=0.99,
                 reason="Cross-PnL/loyalty chưa thuộc Sprint 1.",
                 refusal_code=RefusalCode.cross_pnl,
-            )
-        if _hit(q, self._owner):
-            return original, RouteDecision(
-                intent=IntentType.out_of_scope, confidence=0.99,
-                reason="Không được suy diễn vehicle ownership từ order/buyer signal.",
-                refusal_code=RefusalCode.vehicle_owner,
             )
         if _hit(q, self._raw_pii):
             return original, RouteDecision(
@@ -115,13 +117,19 @@ class RuleRouter:
             )
 
         gsm = bool(re.search(r"\b(gsm|xanh sm|taxi|gọi xe|chuyến)\b", q))
-        vf = bool(re.search(r"\b(vinfast|vf|xe điện|phụ kiện|đơn xe)\b", q))
-        if gsm and vf:
-            # Cross-BU (kết hợp/so sánh GSM và VinFast) ngoài phạm vi Sprint 1.
+        vf = bool(re.search(r"\b(vinfast|vf|xe điện|phụ kiện|đơn xe)\b", q) or _hit(q, self._owner))
+        cross_bu = (gsm and vf) or _hit(q, self._cross_bu) or (gsm and _hit(q, self._owner))
+        if cross_bu:
+            if _hit(q, self._windowed_metric) and not _hit(q, self._window):
+                return original, RouteDecision(
+                    intent=IntentType.clarify, business_unit="CROSS_BU", confidence=0.7,
+                    reason="Thiếu time window cho metric xuyên đơn vị.",
+                    clarifying_question=_WINDOW_QUESTION,
+                    known_slots={"business_unit": "CROSS_BU"}, missing_slots=["window"],
+                )
             return original, RouteDecision(
-                intent=IntentType.out_of_scope, confidence=0.9,
-                reason="Kết hợp/so sánh GSM và VinFast là cross-BU, ngoài phạm vi Sprint 1.",
-                refusal_code=RefusalCode.cross_pnl,
+                intent=IntentType.cross_bu, business_unit="CROSS_BU", confidence=0.85,
+                known_slots={"business_unit": "CROSS_BU"},
             )
         bu = "GSM" if gsm else ("VINFAST" if vf else None)
         # Lọc câu lạc đề: không BU và không tín hiệu domain → ngoài phạm vi
@@ -129,14 +137,15 @@ class RuleRouter:
         if bu is None and not _hit(q, self._domain):
             return original, RouteDecision(
                 intent=IntentType.out_of_scope, confidence=0.7,
-                reason="Câu hỏi ngoài phạm vi dữ liệu feature store Sprint 1 (chỉ GSM/VinFast).",
+                reason="Câu hỏi ngoài phạm vi dữ liệu feature store Sprint 2 (chỉ GSM/VinFast).",
                 refusal_code=RefusalCode.irrelevant,
             )
         if bu and _hit(q, self._windowed_metric) and not _hit(q, self._window):
             return original, RouteDecision(
                 intent=IntentType.clarify, confidence=0.7,
                 reason="Thiếu time window cho metric dùng feature snapshot.",
-                clarifying_question="Bạn muốn xem trong khoảng 1 tuần, 1 tháng hay 12 tháng?",
+                clarifying_question=_WINDOW_QUESTION,
+                known_slots={"business_unit": bu}, missing_slots=["window"],
             )
         if _hit(q, self._cmp):
             intent = IntentType.window_compare
@@ -146,10 +155,17 @@ class RuleRouter:
             intent = IntentType.filter
         else:
             intent = IntentType.single_bu
-        if bu is None and intent == IntentType.single_bu:
+        # Thiếu BU thì phải hỏi lại BẤT KỂ intent. Trước đây chỉ chặn `single_bu`, nên
+        # "Top 10 khách chi tiêu cao nhất 1 tháng" (intent=aggregate/filter) chạy thẳng
+        # và trả về số của MỘT đơn vị mà không nói là đơn vị nào — sai im lặng.
+        if bu is None:
             return original, RouteDecision(
                 intent=IntentType.clarify, confidence=0.55,
                 reason="Chưa xác định được BU.",
-                clarifying_question="Bạn muốn xem dữ liệu GSM hay VinFast?",
+                clarifying_question="Bạn muốn xem dữ liệu GSM, VinFast, hay cả hai?",
+                missing_slots=["business_unit"],
             )
-        return original, RouteDecision(intent=intent, business_unit=bu, confidence=0.75)
+        return original, RouteDecision(
+            intent=intent, business_unit=bu, confidence=0.75,
+            known_slots={"business_unit": bu} if bu else {},
+        )

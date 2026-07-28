@@ -90,10 +90,9 @@ def test_session_isolation():
     assert _STORE["A"].original_question == original_a
 
 
-def test_refusal_applies_on_merged_text():
-    # Nối câu trả lời chứa "chủ xe" → refusal owner vẫn kích hoạt trên text đã nối.
+def test_invalid_short_reply_keeps_pending_slots():
     p = _pipe()
     ask_with_context(p, "S1", AMBIGUOUS)
     r = ask_with_context(p, "S1", "chủ xe VinFast")
-    assert r.status == "out_of_scope"
-    assert "S1" not in _STORE
+    assert r.status == "clarify"
+    assert "S1" in _STORE

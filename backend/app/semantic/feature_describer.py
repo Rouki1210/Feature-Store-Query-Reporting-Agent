@@ -93,7 +93,9 @@ def _business_aliases(stem: str) -> set[str]:
     if "handover_scheduled" in stem:
         aliases.update({"da hen giao", "hen lich giao xe", "cho nhan xe", "sap nhan xe"})
     elif "vehicle_owner" in stem or "vehicle_handover" in stem:
-        aliases.update({"chu xe", "da nhan xe", "dung ten xe", "so huu xe", "ban giao xe"})
+        aliases.update({"chu xe", "da nhan xe", "nhan xe", "dung ten xe", "so huu xe", "ban giao xe"})
+    if stem == "vehicle_delivered_count":
+        aliases.update({"khach nhan xe", "nhan xe", "xe da nhan", "da ban giao xe"})
     if "cross_bu" in stem or stem in ("combined_spend", "dominant_business_unit"):
         aliases.update({
             "ca hai don vi", "ca gsm va vinfast", "vua di gsm vua mua vinfast",

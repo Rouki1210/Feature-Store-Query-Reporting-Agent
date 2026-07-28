@@ -19,7 +19,21 @@ const STATUS_CHIP: Partial<Record<AskStatus, { label: string; cls: string; icon:
   error: { label: "Lỗi", cls: "text-error", icon: "error" },
 };
 
-const QUICK = ["GSM", "VinFast", "Hủy"];
+// Chip phải là thứ backend PARSE ĐƯỢC: xem `_WINDOW_PHRASES` và `_answer_slots`
+// trong backend/app/agent/conversation.py. Đề nghị một lựa chọn rồi từ chối chính
+// câu trả lời đó là cách nhanh nhất để user bỏ cuộc.
+const SLOT_CHOICES: Record<string, string[]> = {
+  business_unit: ["GSM", "VinFast", "Cả hai"],
+  window: ["1 tháng", "3 tháng", "6 tháng", "12 tháng", "Tổng cộng"],
+  top_n: ["Top 10", "Top 20"],
+};
+
+/** Chip gợi ý theo đúng slot còn thiếu; không biết thiếu gì thì hỏi Business Unit. */
+function quickReplies(missing: string[]): string[] {
+  const known = missing.filter((s) => s in SLOT_CHOICES);
+  const slots = known.length ? known : ["business_unit"];
+  return [...slots.flatMap((s) => SLOT_CHOICES[s]), "Hủy"];
+}
 
 export function Message({
   response: r,
@@ -70,7 +84,7 @@ export function Message({
               {r.clarifying_question}
             </div>
             <div className="flex flex-wrap gap-2">
-              {QUICK.map((q) => (
+              {quickReplies(r.missing_slots ?? []).map((q) => (
                 <button
                   key={q}
                   onClick={() => onQuickReply(q)}

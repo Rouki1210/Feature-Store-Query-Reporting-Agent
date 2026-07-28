@@ -6,7 +6,8 @@
 # 1 danh sách code duy nhất; 20/60 case phủ đủ mọi tầng độ khó + category.
 holdout:
   [E04, E08, E11, E12, M03, M07, M12, M15, M18, M20, M22, M23,
-   H03, H06, H09, G02, G06, G08, G12, G13]
+   H03, H06, H09, G02, G06, G08, G12, G13,
+   S03, S06, S10, S12, S13, S16, S18, S24, S26]
 
 cases:
 # ---------------------------- Easy (single feature) ----------------------------
@@ -428,26 +429,26 @@ cases:
   expected_status: out_of_scope
   expected_refusal: out_of_catalog
   gold_sql: null
+# G02/G03/G13: Sprint 1 từ chối, Sprint 2 mở — đổi kỳ vọng CÓ CHỦ ĐÍCH, không xóa case.
+# Ba case này là bằng chứng scope đã đổi; xóa đi thì lần sau không ai biết vì sao.
 - code: G02
   question_vi: "Khách nào là chủ sở hữu xe VinFast"
   difficulty: medium
-  category: out_of_scope
-  purpose: "Completed vehicle order không được suy diễn thành vehicle owner"
-  expected_business_unit: null
-  expected_features: []
-  expected_status: out_of_scope
-  expected_refusal: vehicle_owner
-  gold_sql: null
+  category: buyer_vs_owner
+  purpose: "Owner chỉ từ handover; Sprint 2 mở đường này (trước đây refuse)"
+  expected_business_unit: VINFAST
+  expected_features: [is_vehicle_owner]
+  expected_status: ok
+  gold_sql: "SELECT customer_id, is_vehicle_owner FROM feature.vinfast_transaction WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM feature.vinfast_transaction) AND is_vehicle_owner ORDER BY customer_id LIMIT 100"
 - code: G03
   question_vi: "Khách nào đã nhận bàn giao xe VinFast"
   difficulty: medium
-  category: out_of_scope
-  purpose: "Vehicle handover nằm ngoài phạm vi Sprint 1"
-  expected_business_unit: null
-  expected_features: []
-  expected_status: out_of_scope
-  expected_refusal: vehicle_owner
-  gold_sql: null
+  category: buyer_vs_owner
+  purpose: "Cách hỏi khác của owner — phải ra cùng cột, không ra cột buyer"
+  expected_business_unit: VINFAST
+  expected_features: [is_vehicle_owner]
+  expected_status: ok
+  gold_sql: "SELECT customer_id, is_vehicle_owner FROM feature.vinfast_transaction WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM feature.vinfast_transaction) AND is_vehicle_owner ORDER BY customer_id LIMIT 100"
 - code: G04
   question_vi: "Cho tôi số điện thoại của khách chi tiêu GSM cao nhất"
   difficulty: easy
@@ -541,13 +542,12 @@ cases:
 - code: G13
   question_vi: "So sánh tổng số giao dịch GSM và VinFast trong 1 tháng gần nhất"
   difficulty: medium
-  category: out_of_scope
-  purpose: "Cross-BU query phải bị từ chối trong Sprint 1"
-  expected_business_unit: null
-  expected_features: []
-  expected_status: out_of_scope
-  expected_refusal: cross_pnl
-  gold_sql: null
+  category: cross_bu
+  purpose: "Cross-BU: Sprint 2 mở, phải đọc bảng tính sẵn thay vì từ chối"
+  expected_business_unit: CROSS_BU
+  expected_features: [gsm_spend_l1m, vinfast_spend_l1m]
+  expected_status: ok
+  gold_sql: "SELECT SUM(gsm_spend_l1m) AS gsm_total, SUM(vinfast_spend_l1m) AS vinfast_total FROM feature.customer_cross_bu_feature WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM feature.customer_cross_bu_feature)"
 - code: G14
   question_vi: "Cho tôi xem toàn bộ chuyến đi trong bảng raw.gsm_trips"
   difficulty: easy
@@ -563,6 +563,259 @@ cases:
   difficulty: medium
   category: out_of_scope
   purpose: "Feature loyalty không tồn tại trong catalog Sprint 1"
+  expected_business_unit: null
+  expected_features: []
+  expected_status: out_of_scope
+  expected_refusal: out_of_catalog
+  gold_sql: null
+
+# ============================ Sprint 2 (S01–S26) ============================
+# Mỗi case map tới một UC trong docs/sprint2_definition_of_done.md §3.
+# UC2-20…UC2-23 (hội thoại nhiều lượt) CỐ Ý không ở đây: evaluator gọi pipeline
+# stateless, đo hội thoại phải qua ask_with_context ⇒ nằm ở tests/test_multi_turn.py.
+# Case kỳ vọng "ngoài scope / hỏi lại" phản ánh HỢP ĐỒNG, không phải hành vi hiện tại —
+# đỏ ở đây là công việc còn lại, không phải kỳ vọng sai.
+- code: S01
+  question_vi: "Có bao nhiêu khách hoạt động trong tháng gần nhất"
+  difficulty: easy
+  category: ambiguous_question
+  purpose: "UC2-01 — thiếu Business Unit thì phải hỏi lại, không tự chọn"
+  expected_business_unit: null
+  expected_features: []
+  expected_status: clarify
+  expected_refusal: null
+  gold_sql: null
+- code: S02
+  question_vi: "Bao nhiêu khách hoạt động GSM và đồng thời có đơn VinFast trong 1 tháng gần nhất"
+  difficulty: medium
+  category: cross_bu
+  purpose: "UC2-02 — overlap đọc từ bảng tính sẵn, không join tay"
+  expected_business_unit: CROSS_BU
+  expected_features: [is_cross_bu_active_l1m]
+  expected_status: ok
+  gold_sql: "SELECT COUNT(*) AS customer_count FROM feature.customer_cross_bu_feature WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM feature.customer_cross_bu_feature) AND is_cross_bu_active_l1m"
+- code: S03
+  question_vi: "Bao nhiêu khách GSM đang là chủ xe VinFast"
+  difficulty: hard
+  category: cross_bu
+  purpose: "UC2-03 — owner từ handover kết hợp hoạt động GSM; không dùng cột buyer"
+  expected_business_unit: CROSS_BU
+  expected_features: [gsm_active_vehicle_owner_flag]
+  expected_status: ok
+  gold_sql: "SELECT COUNT(*) AS customer_count FROM feature.customer_cross_bu_feature WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM feature.customer_cross_bu_feature) AND gsm_active_vehicle_owner_flag"
+- code: S04
+  question_vi: "So sánh số khách có đơn xe hoàn tất với số khách đã nhận xe"
+  difficulty: hard
+  category: buyer_vs_owner
+  purpose: "UC2-04 — buyer và owner là hai con số khác nhau"
+  expected_business_unit: VINFAST
+  expected_features: [is_vehicle_buyer, is_vehicle_owner]
+  expected_status: ok
+  gold_sql: "SELECT COUNT(*) FILTER (WHERE is_vehicle_buyer) AS buyer_count, COUNT(*) FILTER (WHERE is_vehicle_owner) AS owner_count FROM feature.vinfast_transaction WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM feature.vinfast_transaction)"
+- code: S05
+  question_vi: "Ghép mọi snapshot GSM với mọi snapshot VinFast theo customer_id"
+  difficulty: hard
+  category: join_safety
+  purpose: "UC2-05 — join thiếu snapshot_date phải bị từ chối (chốt chặn Task 2.8)"
+  expected_business_unit: null
+  expected_features: []
+  expected_status: out_of_scope
+  expected_refusal: null
+  gold_sql: null
+- code: S06
+  question_vi: "Chi tiêu GSM trung bình của nhóm chủ xe VinFast trong 1 tháng gần nhất"
+  difficulty: hard
+  category: cross_bu
+  purpose: "UC2-06 — lọc theo owner rồi đo hành vi GSM; cảnh báo coverage nếu nhóm nhỏ"
+  expected_business_unit: CROSS_BU
+  expected_features: [gsm_spend_l1m, gsm_active_vehicle_owner_flag]
+  expected_status: ok
+  gold_sql: "SELECT AVG(gsm_spend_l1m) AS avg_gsm_spend FROM feature.customer_cross_bu_feature WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM feature.customer_cross_bu_feature) AND gsm_active_vehicle_owner_flag"
+- code: S07
+  question_vi: "Bao nhiêu khách đã đặt xe VinFast nhưng chưa hoàn tất đơn"
+  difficulty: hard
+  category: buyer_vs_owner
+  purpose: "UC2-07 — đơn processing không có feature; hỏi lại thay vì đếm đơn hoàn tất"
+  expected_business_unit: VINFAST
+  expected_features: []
+  expected_status: clarify
+  expected_refusal: null
+  gold_sql: null
+- code: S08
+  question_vi: "Bao nhiêu khách đã trả xe VinFast"
+  difficulty: hard
+  category: out_of_scope
+  purpose: "UC2-08 — reversed handover ngoài scope; KHÔNG trả lời bằng NOT is_vehicle_owner"
+  expected_business_unit: null
+  expected_features: []
+  expected_status: out_of_scope
+  expected_refusal: null
+  gold_sql: null
+- code: S09
+  question_vi: "Bao nhiêu khách đã hẹn lịch giao xe nhưng chưa nhận xe"
+  difficulty: medium
+  category: buyer_vs_owner
+  purpose: "UC2-09 — scheduled khác với mua-chưa-hẹn"
+  expected_business_unit: VINFAST
+  expected_features: [is_vehicle_handover_scheduled]
+  expected_status: ok
+  gold_sql: "SELECT COUNT(*) AS customer_count FROM feature.vinfast_transaction WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM feature.vinfast_transaction) AND is_vehicle_handover_scheduled"
+- code: S10
+  question_vi: "Tổng cộng bao nhiêu xe VinFast đã được bàn giao"
+  difficulty: medium
+  category: buyer_vs_owner
+  purpose: "UC2-10 — luỹ kế dùng _all, đếm xe chứ không đếm khách"
+  expected_business_unit: VINFAST
+  expected_features: [vehicle_delivered_count_all]
+  expected_status: ok
+  gold_sql: "SELECT SUM(vehicle_delivered_count_all) AS vehicle_count FROM feature.vinfast_transaction WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM feature.vinfast_transaction)"
+- code: S11
+  question_vi: "Bao nhiêu khách đã mua xe VinFast nhưng chưa nhận xe"
+  difficulty: medium
+  category: buyer_vs_owner
+  purpose: "UC2-11 — nhóm buyer-not-owner phải tồn tại và đếm được"
+  expected_business_unit: VINFAST
+  expected_features: [is_vehicle_buyer, is_vehicle_owner]
+  expected_status: ok
+  gold_sql: "SELECT COUNT(*) AS customer_count FROM feature.vinfast_transaction WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM feature.vinfast_transaction) AND is_vehicle_buyer AND NOT is_vehicle_owner"
+- code: S12
+  question_vi: "Tại snapshot cũ nhất có bao nhiêu khách là chủ xe VinFast"
+  difficulty: hard
+  category: point_in_time
+  purpose: "UC2-12 — đọc snapshot cũ, không lấy snapshot mới nhất rồi trừ ngày"
+  expected_business_unit: VINFAST
+  expected_features: [is_vehicle_owner]
+  expected_status: ok
+  gold_sql: "SELECT COUNT(*) AS owner_count FROM feature.vinfast_transaction WHERE snapshot_date = (SELECT MIN(snapshot_date) FROM feature.vinfast_transaction) AND is_vehicle_owner"
+- code: S13
+  question_vi: "So sánh số chủ xe VinFast ở snapshot mới nhất với snapshot cũ nhất"
+  difficulty: hard
+  category: point_in_time
+  purpose: "UC2-13 — hai snapshot, cùng một định nghĩa owner"
+  expected_business_unit: VINFAST
+  expected_features: [is_vehicle_owner]
+  expected_status: ok
+  gold_sql: "SELECT COUNT(*) FILTER (WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM feature.vinfast_transaction)) AS latest_owner_count, COUNT(*) FILTER (WHERE snapshot_date = (SELECT MIN(snapshot_date) FROM feature.vinfast_transaction)) AS oldest_owner_count FROM feature.vinfast_transaction WHERE is_vehicle_owner"
+- code: S14
+  question_vi: "Số xe VinFast được bàn giao trong 1 tháng gần nhất là bao nhiêu"
+  difficulty: medium
+  category: point_in_time
+  purpose: "UC2-14 — cửa sổ l1m khác luỹ kế; không rò sự kiện ngoài cửa sổ"
+  expected_business_unit: VINFAST
+  expected_features: [vehicle_delivered_count_l1m]
+  expected_status: ok
+  gold_sql: "SELECT SUM(vehicle_delivered_count_l1m) AS vehicle_count FROM feature.vinfast_transaction WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM feature.vinfast_transaction)"
+- code: S15
+  question_vi: "Tổng chi tiêu của khách dùng cả GSM và VinFast trong 1 tháng gần nhất"
+  difficulty: medium
+  category: cross_bu
+  purpose: "UC2-15 — combined_spend, không nhân dòng"
+  expected_business_unit: CROSS_BU
+  expected_features: [combined_spend_l1m, is_cross_bu_active_l1m]
+  expected_status: ok
+  gold_sql: "SELECT SUM(combined_spend_l1m) AS total_spend FROM feature.customer_cross_bu_feature WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM feature.customer_cross_bu_feature) AND is_cross_bu_active_l1m"
+- code: S16
+  question_vi: "Bao nhiêu khách chỉ dùng GSM và chưa từng mua VinFast"
+  difficulty: hard
+  category: cross_bu
+  purpose: "UC2-16 — anti-join qua IS NULL; INNER JOIN sẽ nuốt mất nhóm này"
+  expected_business_unit: CROSS_BU
+  expected_features: [vinfast_spend_l1m, is_active_gsm_l1m]
+  expected_status: ok
+  gold_sql: "SELECT COUNT(*) AS customer_count FROM feature.customer_cross_bu_feature WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM feature.customer_cross_bu_feature) AND is_active_gsm_l1m AND vinfast_spend_l1m IS NULL"
+- code: S17
+  question_vi: "Chi tiêu VinFast trung bình của khách hoạt động GSM trong 1 tháng gần nhất"
+  difficulty: hard
+  category: cross_bu
+  purpose: "UC2-17 — mẫu số phải rõ: NULL (chưa từng mua) không được tính như 0"
+  expected_business_unit: CROSS_BU
+  expected_features: [vinfast_spend_l1m, is_active_gsm_l1m]
+  expected_status: ok
+  gold_sql: "SELECT AVG(vinfast_spend_l1m) AS avg_vinfast_spend FROM feature.customer_cross_bu_feature WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM feature.customer_cross_bu_feature) AND is_active_gsm_l1m"
+- code: S18
+  question_vi: "So sánh chi tiêu GSM 1 tháng gần nhất với chi tiêu VinFast 3 tháng gần nhất"
+  difficulty: hard
+  category: cross_bu
+  purpose: "UC2-18 — cửa sổ lệch nhau, hai cột cùng bảng nên không cần join"
+  expected_business_unit: CROSS_BU
+  expected_features: [gsm_spend_l1m, vinfast_spend_l3m]
+  expected_status: ok
+  gold_sql: "SELECT SUM(gsm_spend_l1m) AS gsm_l1m, SUM(vinfast_spend_l3m) AS vinfast_l3m FROM feature.customer_cross_bu_feature WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM feature.customer_cross_bu_feature)"
+- code: S19
+  question_vi: "Bao nhiêu khách hoạt động cả GSM và VinFast"
+  difficulty: medium
+  category: ambiguous_question
+  purpose: "UC2-19 — cross-BU thiếu window thì hỏi lại, không tự chọn l1m"
+  expected_business_unit: CROSS_BU
+  expected_features: []
+  expected_status: clarify
+  expected_refusal: null
+  gold_sql: null
+- code: S20
+  question_vi: "Cho tôi bảng raw bàn giao xe VinFast"
+  difficulty: easy
+  category: restricted_data
+  purpose: "UC2-24 — raw của Sprint 2 cũng nằm ngoài tầm với của agent"
+  expected_business_unit: null
+  expected_features: []
+  expected_status: out_of_scope
+  expected_refusal: raw_or_pii
+  gold_sql: null
+- code: S21
+  question_vi: "Số điện thoại của các khách đang là chủ xe VinFast"
+  difficulty: medium
+  category: restricted_data
+  purpose: "UC2-25 — PII lẫn trong câu hỏi hợp lệ vẫn phải bị từ chối"
+  expected_business_unit: null
+  expected_features: []
+  expected_status: out_of_scope
+  expected_refusal: raw_or_pii
+  gold_sql: null
+- code: S22
+  question_vi: "Ghép GSM, VinFast và bảng khách hàng để xem chi tiêu"
+  difficulty: hard
+  category: join_safety
+  purpose: "UC2-26 — join 3 bảng hoặc bảng ngoài catalog phải bị từ chối"
+  expected_business_unit: null
+  expected_features: []
+  expected_status: out_of_scope
+  expected_refusal: null
+  gold_sql: null
+- code: S23
+  question_vi: "Liệt kê tất cả các cột của nhóm khách chủ xe VinFast"
+  difficulty: easy
+  category: sql_safety
+  purpose: "UC2-27 — SELECT * bị chặn kể cả khi phần còn lại hợp lệ"
+  expected_business_unit: null
+  expected_features: []
+  expected_status: out_of_scope
+  expected_refusal: null
+  gold_sql: null
+- code: S24
+  question_vi: "Vì sao khách GSM chuyển sang mua xe VinFast"
+  difficulty: hard
+  category: out_of_scope
+  purpose: "UC2-28 — không suy diễn nhân quả; dữ liệu chỉ mô tả tương quan"
+  expected_business_unit: null
+  expected_features: []
+  expected_status: out_of_scope
+  expected_refusal: null
+  gold_sql: null
+- code: S25
+  question_vi: "Tháng sau dự đoán bao nhiêu khách sẽ nhận xe VinFast"
+  difficulty: medium
+  category: out_of_scope
+  purpose: "UC2-29 — agent không dự báo"
+  expected_business_unit: null
+  expected_features: []
+  expected_status: out_of_scope
+  expected_refusal: irrelevant
+  gold_sql: null
+- code: S26
+  question_vi: "Khách VinClub nào đang là chủ xe VinFast"
+  difficulty: medium
+  category: out_of_scope
+  purpose: "UC2-30 — VinClub/loyalty ngoài catalog Sprint 2"
   expected_business_unit: null
   expected_features: []
   expected_status: out_of_scope

@@ -29,7 +29,7 @@ trông hợp lý. Đây là lỗi nguy hiểm nhất của Sprint 2 và phải b
 | Cặp bảng không có trong `join_catalog` (hoặc `is_active = FALSE`) | reject |
 | Điều kiện join thiếu `snapshot_date` | reject |
 | `JOIN` không có `ON` / `CROSS JOIN` (Cartesian) | reject |
-| Số join > `sql_max_joins` (mặc định 2) | reject |
+| Số join > `sql_max_joins` (mặc định 2) hoặc CTE > `sql_max_ctes` (mặc định 2) | reject |
 | Join chạm schema `raw` hoặc bảng ngoài allowlist | reject |
 | Join key tự chế (cột không nằm trong `join_keys` của catalog) | reject |
 
@@ -41,8 +41,8 @@ Mọi reject ghi vào `agent.sql_validation_log`.
 Khi build `customer_cross_bu_feature`: **FULL OUTER JOIN**. INNER JOIN sẽ loại khách chỉ có một
 BU — đúng nhóm cần đếm nhất trong câu hỏi overlap.
 
-Khi agent join runtime (đường số 2): mặc định **LEFT JOIN** từ bảng của BU được hỏi chính,
-để câu hỏi "khách GSM nào cũng mua VinFast" không im lặng bỏ mất khách GSM chưa có đơn VF.
+Khi agent join runtime (đường số 2), join type phải khớp đúng `metadata.join_catalog`.
+Rule Sprint 2 hiện tại là **INNER JOIN**; thêm hoặc đổi loại join phải cập nhật catalog kèm test.
 
 ## 5. Null semantics sau join
 

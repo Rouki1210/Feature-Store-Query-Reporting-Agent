@@ -799,7 +799,9 @@ CREATE TABLE IF NOT EXISTS eval.query_test_case (
                 'ambiguous_question',
                 'out_of_scope',
                 'restricted_data',
-                'sql_safety'
+                'sql_safety',
+                'buyer_vs_owner',
+                'cross_bu'
             )
         )
 );

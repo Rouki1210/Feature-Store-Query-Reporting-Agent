@@ -7,6 +7,7 @@ from __future__ import annotations
 import pytest
 
 from app.config import Settings
+from app.agent.join_planner import JoinPlanner
 from app.sql.guards import GuardError, is_safe, validate_sql
 
 # Settings cố định cho test (không phụ thuộc .env).
@@ -14,6 +15,10 @@ SETTINGS = Settings(
     SQL_MAX_ROWS=100,
     SQL_SENSITIVE_COLUMNS="phone,email,national_id,customer_name",
 )
+JOIN_PLAN = JoinPlanner().plan("cross_bu", {
+    "feature.gsm_transaction", "feature.vinfast_transaction",
+}).plan.as_dict()
+JOIN_RULES = JoinPlanner().rules
 
 
 # ---------------- Truy vấn hợp lệ ----------------
@@ -134,13 +139,52 @@ def test_metadata_schema_allowed():
     assert is_safe("SELECT feature_name FROM metadata.feature_catalog", SETTINGS)
 
 
-def test_cross_bu_join_rejected_by_sql_guard():
+def test_catalog_join_with_all_keys_passes():
+    safe = validate_sql(
+        "SELECT g.customer_id, g.completed_txn_count_l1m "
+        "FROM feature.gsm_transaction g INNER JOIN feature.vinfast_transaction v "
+        "ON g.customer_id = v.customer_id AND g.snapshot_date = v.snapshot_date",
+        SETTINGS, join_plan=JOIN_PLAN, join_rules=JOIN_RULES,
+    )
+    assert "INNER JOIN" in safe.upper()
+
+
+@pytest.mark.parametrize("sql", [
+    "SELECT g.customer_id FROM feature.gsm_transaction g "
+    "JOIN feature.vinfast_transaction v ON g.customer_id = v.customer_id",
+    "SELECT g.customer_id FROM feature.gsm_transaction g CROSS JOIN feature.vinfast_transaction v",
+    "SELECT g.customer_id FROM feature.gsm_transaction g JOIN feature.vinfast_transaction v",
+    "SELECT g.customer_id FROM feature.gsm_transaction g LEFT JOIN feature.vinfast_transaction v "
+    "ON g.customer_id = v.customer_id AND g.snapshot_date = v.snapshot_date",
+    "SELECT g.customer_id FROM feature.gsm_transaction g INNER JOIN feature.vinfast_transaction v "
+    "ON g.customer_id = v.customer_id AND g.snapshot_date = v.snapshot_date AND g.completed_txn_count_l1m = v.txn_completed_count_l1m",
+])
+def test_runtime_join_policy_rejects_invalid_catalog_variants(sql):
+    with pytest.raises(GuardError):
+        validate_sql(sql, SETTINGS, join_plan=JOIN_PLAN, join_rules=JOIN_RULES)
+
+
+def test_join_without_context_is_rejected():
     with pytest.raises(GuardError):
         validate_sql(
-            "SELECT g.customer_id FROM feature.gsm_transaction g "
-            "JOIN feature.vinfast_transaction v ON v.customer_id = g.customer_id",
-            SETTINGS,
+            "SELECT g.customer_id FROM feature.gsm_transaction g INNER JOIN feature.vinfast_transaction v "
+            "ON g.customer_id = v.customer_id AND g.snapshot_date = v.snapshot_date", SETTINGS,
         )
+
+
+@pytest.mark.parametrize("sql", [
+    "SELECT g.customer_id FROM feature.gsm_transaction g INNER JOIN feature.vinfast_transaction v "
+    "ON g.customer_id = v.customer_id AND g.snapshot_date = v.snapshot_date "
+    "INNER JOIN feature.customer_cross_bu_feature c ON c.customer_id = g.customer_id",
+    "SELECT customer_id FROM feature.gsm_transaction UNION SELECT customer_id FROM raw.customers",
+    "SELECT customer_id FROM (SELECT customer_id FROM raw.customers) x",
+    "WITH a AS (SELECT customer_id FROM feature.gsm_transaction), "
+    "b AS (SELECT customer_id FROM feature.gsm_transaction), "
+    "c AS (SELECT customer_id FROM feature.gsm_transaction) SELECT customer_id FROM a",
+])
+def test_join_adversarial_queries_are_rejected(sql):
+    with pytest.raises(GuardError):
+        validate_sql(sql, SETTINGS, join_plan=JOIN_PLAN, join_rules=JOIN_RULES)
 
 
 @pytest.mark.parametrize("sql", [

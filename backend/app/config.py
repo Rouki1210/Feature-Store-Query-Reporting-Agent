@@ -34,9 +34,9 @@ class Settings(BaseSettings):
     sql_max_rows: int = Field(default=1000, alias="SQL_MAX_ROWS")
     sql_default_rows: int = Field(default=100, alias="SQL_DEFAULT_ROWS")
     sql_timeout_ms: int = Field(default=5_000, ge=1, alias="SQL_TIMEOUT_MS")
-    # Số phép JOIN tối đa. 1 = ghép nhiều nhất hai bảng — đủ cho mọi câu hỏi cross-BU
-    # của Sprint 2, và mỗi phép ghép thêm là một cơ hội nhân dòng.
-    sql_max_joins: int = Field(default=1, ge=0, alias="SQL_MAX_JOINS")
+    # Giới hạn cấu trúc SQL; catalog vẫn là chốt chặn từng cặp/key join.
+    sql_max_joins: int = Field(default=2, ge=0, alias="SQL_MAX_JOINS")
+    sql_max_ctes: int = Field(default=2, ge=0, alias="SQL_MAX_CTES")
     sql_sensitive_columns: str = Field(
         default="customer_name,phone,phone_number,email,national_id,cccd,address,dob,full_name",
         alias="SQL_SENSITIVE_COLUMNS",

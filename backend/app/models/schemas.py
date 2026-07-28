@@ -62,6 +62,9 @@ class AskResponse(BaseModel):
     coverage: CoverageInfo | None = None
     repairs: int = Field(default=0, description="Số lần tự sửa SQL đã dùng")
     clarifying_question: str | None = None
+    join_explanation: str | None = None
+    known_slots: dict[str, str | int] = Field(default_factory=dict)
+    missing_slots: list[str] = Field(default_factory=list)
     refusal_code: str | None = Field(
         default=None, description="Mã từ chối khi out_of_scope/clarify (cho eval guardrail)."
     )

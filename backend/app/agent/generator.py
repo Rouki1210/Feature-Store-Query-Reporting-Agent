@@ -7,9 +7,10 @@ from app.agent.contracts import GenerationRequest, GenerationResponse, IntentTyp
 from app.agent.llm_client import JSONLLM
 
 # Bump khi sửa SYSTEM_PROMPT — nhãn cho eval.query_test_run.prompt_version (so before/after).
-PROMPT_VERSION = "sprint1-v2"
+# Mỗi lần bump phải thêm một dòng vào prompts/CHANGELOG.md kèm số eval trước/sau.
+PROMPT_VERSION = "sprint2-v2"
 
-SYSTEM_PROMPT = """You are the read-only SQL Generator for the Sprint 1 Feature Store.
+SYSTEM_PROMPT = """You are the read-only SQL Generator for the Sprint 2 Feature Store.
 
 TASK
 - Convert the user's business question into exactly ONE PostgreSQL SELECT or WITH...SELECT statement.
@@ -29,8 +30,11 @@ MANDATORY RULES
    snapshot_date = (SELECT MAX(snapshot_date) FROM <same_feature_table>).
 6. Use precomputed time-window columns such as *_l1m, *_l3m, and *_l12m. Do not turn
    those windows into date filters over raw data.
-7. A completed VinFast order means only that the order status is completed. It is not
-   evidence of vehicle handover or ownership.
+7. A completed VinFast order, or is_vehicle_buyer, means only that the order reached
+   completed status. It is not evidence of vehicle handover or ownership. Only the
+   handover-derived is_vehicle_owner identifies a vehicle owner, and
+   is_vehicle_handover_scheduled means a handover is booked but has NOT happened yet.
+   Buyer, scheduled, and owner are three different groups; never substitute one for another.
 8. selected_features must contain only feature columns that actually appear in the SQL.
    Do not include customer_id, snapshot_date, aliases, or aggregate labels.
 9. Never invent a table or column to fill missing context. Record necessary assumptions
@@ -45,14 +49,20 @@ MANDATORY RULES
       and "giá gốc" map to *_price_* or *_original_price_* features. Never substitute one.
     - For a comparison or trend, project exactly the selected *_vs_* ratio feature; do not
       add its base-window columns or neighbouring ratio features.
-12. Understand Vietnamese and English questions, but always generate PostgreSQL syntax.
+12. For cross-BU questions, use feature.customer_cross_bu_feature first when its retrieved
+   features answer the question. Runtime JOIN is permitted only when join_plan is present:
+   use exactly its tables, join type, and join keys. Never invent join keys, use CROSS JOIN,
+   omit ON, or hide a join inside a CTE/subquery. WITH...SELECT is allowed but at most two CTEs.
+13. assumptions may state only a short, checkable data limitation or scope assumption for a
+   partial answer. They never excuse missing SQL predicates, missing features, or an unsupported join.
+14. Understand Vietnamese and English questions, but always generate PostgreSQL syntax.
 
 OUTPUT CONTRACT
 Return exactly one JSON object. Do not use Markdown or add text outside the JSON:
 {
   "sql": "string",
   "selected_features": ["string"],
-  "intent": "single_bu|aggregate|filter|window_compare",
+  "intent": "cross_bu|single_bu|aggregate|filter|window_compare",
   "assumptions": ["string"],
   "confidence": 0.0
 }
@@ -60,7 +70,7 @@ Return exactly one JSON object. Do not use Markdown or add text outside the JSON
 The field types are strict:
 - sql: string
 - selected_features: array of strings
-- intent: exactly one of the four enum values shown above
+- intent: exactly one of the five query enum values shown above
 - assumptions: array of strings, never a single string
 - confidence: number between 0 and 1
 """
@@ -75,7 +85,8 @@ class SQLGenerator:
             SYSTEM_PROMPT,
             json.dumps({"question": request.question, "intent": request.route.intent.value,
                         "business_unit": request.route.business_unit,
-                        "feature_context": request.feature_context}, ensure_ascii=False),
+                        "feature_context": request.feature_context,
+                        "join_plan": request.join_plan}, ensure_ascii=False),
         )
         return self._parse(payload, request.route.intent)
 
@@ -83,7 +94,8 @@ class SQLGenerator:
         payload = self.client.complete_json(
             SYSTEM_PROMPT,
             json.dumps({"question": request.question, "previous_sql": request.previous_sql,
-                        "error": request.error, "feature_context": request.feature_context}, ensure_ascii=False),
+                        "error": request.error, "feature_context": request.feature_context,
+                        "join_plan": request.join_plan}, ensure_ascii=False),
         )
         return self._parse(payload, intent)
 

@@ -46,6 +46,10 @@ export interface AskResponse {
   confidence: Confidence;
   coverage: CoverageInfo | null;
   repairs: number;
+  join_explanation: string | null;
+  refusal_code: string | null;
+  known_slots: Record<string, string | number>;
+  missing_slots: string[]; // "business_unit" | "window" | "top_n"
   clarifying_question: string | null;
   error: string | null;
   pipeline_trace: TraceItem[];

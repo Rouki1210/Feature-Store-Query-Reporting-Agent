@@ -47,8 +47,10 @@ def test_phone_still_refused():
 def test_nvso_still_needs_review():
     assert _decide("đếm nvso completed l12m").refusal_code == RefusalCode.needs_review
 
-def test_owner_still_refused():
-    assert _decide("khách nào là owner xe").refusal_code == RefusalCode.vehicle_owner
+def test_owner_routes_to_vinfast():
+    d = _decide("Đã có bao nhiêu khách nhận xe trong tháng trước")
+    assert d.intent != IntentType.out_of_scope
+    assert d.business_unit == "VINFAST"
 
 def test_window_compare_intent_via_vs():
     d = _decide("GSM số chuyến l1m vs l3m")

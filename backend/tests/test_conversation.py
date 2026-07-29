@@ -13,16 +13,18 @@ from app.agent.llm_client import StaticJSONClient
 from app.agent.pipeline import AgentPipeline
 
 # Câu gốc thiếu BU → router clarify (tránh mọi trigger gsm/vf như "chuyến"/"taxi").
-# Nối "GSM" ⇒ retrieve completed_discount_amount_sum_l1m (top hit), stub chọn đúng nó.
+# Nối "GSM" ⇒ retrieve các cột completed_* của GSM; stub chọn một cột CÓ trong đó.
+# Không dùng cột *_discount_*: câu hỏi không nhắc giảm giá nên retriever phạt điểm
+# cột hẹp hơn câu hỏi (_NARROWING) và nó rớt khỏi context.
 AMBIGUOUS = "số giao dịch hoàn thành trong tháng gần nhất"
 GSM_PAYLOAD = {
     # ORDER BY customer_id là bắt buộc với list per-customer (validator.py:74) — stub phải
     # sinh SQL hợp lệ, nếu không test state lại đỏ vì lý do chẳng liên quan tới state.
     "sql": (
-        "SELECT customer_id, completed_discount_amount_sum_l1m "
+        "SELECT customer_id, completed_original_price_sum_l1m "
         "FROM feature.gsm_transaction ORDER BY customer_id"
     ),
-    "selected_features": ["completed_discount_amount_sum_l1m"],
+    "selected_features": ["completed_original_price_sum_l1m"],
     "intent": "single_bu",
     "confidence": 0.95,
 }

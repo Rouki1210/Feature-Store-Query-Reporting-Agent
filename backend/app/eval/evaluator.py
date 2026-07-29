@@ -76,10 +76,13 @@ def _retrieval_for(router: RuleRouter, layer, question: str, top_k: int = 5) -> 
     _, route = router.route(question)
     if route.intent in (IntentType.out_of_scope, IntentType.clarify):
         return []  # router chặn answerable → retrieval coi như trượt
-    scored = layer.retrieve(question, top_k=top_k)
-    if route.business_unit:
-        scored = [f for f in scored if f.table.split(".", 1)[-1].startswith(route.business_unit.lower())]
-    return [f.name for f in scored]
+    # Phải gọi ĐÚNG như pipeline: truyền business_unit vào retrieve, không tự lọc lại.
+    # Bản cũ lọc theo TIỀN TỐ TÊN BẢNG nên `CROSS_BU` không khớp `customer_cross_bu_feature`
+    # ⇒ mọi case cross-BU bị chấm 0% retrieval trong khi pipeline lấy đúng cột ở rank 1.
+    # Thước đo lệch khỏi hệ thống thật thì mọi kết luận tối ưu sau đó đều đáng ngờ.
+    return [f.name for f in layer.retrieve(
+        question, business_unit=route.business_unit, top_k=top_k,
+    )]
 
 
 def _recall_at_5(expected: set[str], retrieved: list[str]) -> float | None:

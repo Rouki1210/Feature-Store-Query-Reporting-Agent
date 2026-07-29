@@ -85,7 +85,9 @@ def _business_aliases(stem: str) -> set[str]:
     if stem.startswith("days_since_last"):
         aliases.update({"chua quay lai", "lau khong su dung", "lan cuoi"})
     if stem.startswith("days_since_first"):
-        aliases.update({"bat dau su dung", "giao dich dau tien", "lan dau"})
+        # "dau tien" phải đứng riêng: câu thật hay chèn chữ vào giữa ("giao dịch
+        # VinFast hoàn thành ĐẦU TIÊN"), nên alias cả cụm dài không khớp substring.
+        aliases.update({"bat dau su dung", "giao dich dau tien", "lan dau", "dau tien"})
     if "active_day_count" in stem:
         aliases.update({"hoat dong thuong xuyen", "so ngay hoat dong"})
     if "discount" in stem:

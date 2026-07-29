@@ -4,6 +4,7 @@ Bug cũ: 'earn' ⊂ 'learn', 'wo' ⊂ 'word', 'phone' ⊂ 'iphone' → refuse oa
 """
 from app.agent.contracts import IntentType, RefusalCode
 from app.agent.router import RuleRouter
+import pytest
 
 R = RuleRouter()
 
@@ -80,3 +81,14 @@ def test_valid_bu_question_not_filtered():
     d = _decide("GSM có bao nhiêu chuyến hoàn thành l1m")
     assert d.intent != IntentType.out_of_scope
     assert d.business_unit == "GSM"
+
+
+@pytest.mark.parametrize("question, intent", [
+    ("Ghép mọi snapshot GSM với mọi snapshot VinFast theo customer_id", IntentType.out_of_scope),
+    ("Ghép GSM, VinFast và bảng khách hàng để xem chi tiêu", IntentType.out_of_scope),
+    ("Bao nhiêu khách đã trả xe VinFast", IntentType.out_of_scope),
+    ("Tháng sau dự đoán bao nhiêu khách sẽ nhận xe VinFast", IntentType.out_of_scope),
+    ("Bao nhiêu khách đã đặt xe VinFast nhưng chưa hoàn tất đơn", IntentType.clarify),
+])
+def test_router_handles_eval_guardrail_cases(question, intent):
+    assert _decide(question).intent == intent

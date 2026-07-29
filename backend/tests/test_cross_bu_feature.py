@@ -229,6 +229,41 @@ def test_owner_question_ranks_owner_above_buyer():
     assert delivered[0].name == "vehicle_delivered_count_l1m"
 
 
+def test_narrow_features_lose_to_the_general_one():
+    """Cột hẹp hơn câu hỏi phải bị phạt điểm.
+
+    "Số đơn VinFast hoàn thành" = MỌI đơn, không riêng đơn mua xe / phụ kiện / có
+    giảm giá. Không phạt thì cột hẹp thắng nhờ trùng token và agent trả lời một tập
+    con mà người hỏi không hề biết — đúng hai case E09/M11 từng đỏ trong eval.
+    """
+    from app.semantic.retriever import SemanticLayer
+
+    layer = SemanticLayer.load("data/semantic_layer.yaml")
+    hits = layer.retrieve(
+        "Số đơn VinFast hoàn thành trong 12 tháng gần nhất của mọi khách",
+        business_unit="VINFAST", top_k=5)
+    # Cột đúng phải đứng NHẤT. Cột hẹp chỉ bị giảm điểm chứ không bị loại — retrieval
+    # hiểu sai câu hỏi vẫn còn đường cứu ở top-k.
+    assert hits[0].name == "txn_completed_count_l12m"
+    narrow = next(f for f in hits if f.name == "vehicle_purchase_completed_count_l12m")
+    assert hits[0].score > narrow.score + 2
+
+
+def test_narrowing_penalty_lifts_only_when_the_question_asks_for_it():
+    """Hỏi đúng phạm vi hẹp thì cột hẹp phải quay lại top."""
+    from app.semantic.retriever import SemanticLayer
+
+    layer = SemanticLayer.load("data/semantic_layer.yaml")
+    accessories = [f.name for f in layer.retrieve(
+        "Số đơn phụ kiện VinFast hoàn thành trong 12 tháng gần nhất",
+        business_unit="VINFAST", top_k=3)]
+    assert any("accessories" in name for name in accessories)
+
+    vehicles = [f.name for f in layer.retrieve(
+        "Bao nhiêu khách đã mua xe VinFast", business_unit="VINFAST", top_k=3)]
+    assert any("vehicle" in name for name in vehicles)
+
+
 def test_money_question_does_not_return_boolean_flags():
     """Cờ boolean không phải câu trả lời cho câu hỏi về tiền."""
     from app.semantic.retriever import SemanticLayer

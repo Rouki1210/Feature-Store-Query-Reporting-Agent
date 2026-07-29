@@ -46,6 +46,26 @@ _WINDOW_ALIASES = {
     ),
 }
 
+# Feature MANG NGỮ NGHĨA HẸP HƠN câu hỏi thì phải bị phạt: "số đơn VinFast hoàn thành"
+# là mọi đơn, không phải riêng đơn mua xe / phụ kiện / có giảm giá. Không phạt thì các
+# cột hẹp thắng nhờ trùng token, và agent trả lời một tập con mà người hỏi không hề biết.
+# Mỗi dòng: (mảnh trong TÊN cột, những từ trong CÂU HỎI cho phép mảnh đó xuất hiện).
+_NARROWING: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("vehicle", ("xe", "vehicle", "car", "oto", "o to", "chu xe", "ban giao")),
+    ("accessories", ("phu kien", "accessories")),
+    ("discount", ("giam gia", "chiet khau", "discount")),
+    ("battery", ("pin", "battery")),
+    ("type_taxi", ("taxi",)),
+    ("type_bike", ("xe may", "bike")),
+    ("type_express", ("giao nhanh", "express")),
+    ("type_food", ("do an", "food")),
+    ("_wo_", ("work order", "work_order", "wo")),
+    ("nvso", ("nvso",)),
+)
+# Đủ lớn để lật thứ hạng khi các cột chỉ hơn nhau ~0.5 điểm trùng token, nhưng vẫn
+# để cột hẹp nằm trong top-k (giảm điểm, không loại) phòng khi retrieval hiểu sai.
+_NARROWING_PENALTY = 3.0
+
 _RISK_TERMS = {
     "nvso", "work order", "work_order", "wo", "owner", "ownership",
     "chủ sở hữu", "sở hữu", "buyer", "người mua", "completed order",
@@ -63,6 +83,14 @@ def _strip_accents(text: str) -> str:
 
 def _tokens(text: str) -> set[str]:
     return {t for t in re.split(r"[^a-z0-9_]+", _strip_accents(text)) if len(t) >= 2}
+
+
+def _unrequested_narrowing(name_norm: str, q_norm: str) -> int:
+    """Đếm số mảnh thu hẹp có trong TÊN cột mà câu hỏi không hề nhắc tới."""
+    return sum(
+        1 for fragment, terms in _NARROWING
+        if fragment in name_norm and not _has_term(q_norm, terms)
+    )
 
 
 def _has_term(text: str, terms: tuple[str, ...]) -> bool:
@@ -193,14 +221,16 @@ class SemanticLayer:
             ]
             if positions:
                 matches.append((min(positions), window))
+        if any(alias in q_norm for alias in ("gan day", "recent", "recently")):
+            matches.append((q_norm.find("gan day") if "gan day" in q_norm else 0, "l1m"))
         matches.sort()
         return [window for _, window in matches]
 
     @staticmethod
     def _metric_hint(q_norm: str) -> str | None:
-        if _has_term(q_norm, ("ty le", "ratio", "rate", "trend", "xu huong", "so sanh", "compare")):
+        if _has_term(q_norm, ("ty le", "ratio", "rate", "trend", "xu huong", "thay doi", "so sanh", "compare")):
             return "ratio"
-        if _has_term(q_norm, ("tong tien", "chi tieu", "doanh thu", "amount", "spend", "value", "price", "gia")):
+        if _has_term(q_norm, ("tong tien", "chi tieu", "doanh thu", "amount", "spend", "value", "price", "gia", "quang duong", "distance", "km")):
             return "value"
         if _has_term(
             q_norm,
@@ -215,7 +245,7 @@ class SemanticLayer:
     @staticmethod
     def _is_compare(q_norm: str) -> bool:
         return _has_term(
-            q_norm, ("so sanh", "compare", "versus", "vs", "tang giam", "trend")
+            q_norm, ("so sanh", "compare", "versus", "vs", "tang giam", "thay doi", "xu huong", "trend")
         )
 
     def retrieve(
@@ -241,7 +271,7 @@ class SemanticLayer:
             q_norm,
             (
                 "tong tien", "chi tieu", "doanh thu", "amount", "spend",
-                "value", "price", "gia",
+                "value", "price", "gia", "quang duong", "distance", "km",
             ),
         )
         discount_requested = _has_term(q_norm, ("discount", "chiet khau", "giam gia"))
@@ -255,9 +285,24 @@ class SemanticLayer:
         ratio_window = (
             f"{window_hints[0]}_vs_{window_hints[1]}"
             if compare and len(window_hints) >= 2
-            else None
+            else ("l1m_vs_l3m" if compare and window_hint == "l1m" else None)
         )
         unit = business_unit.upper() if business_unit else None
+        if unit == "CROSS_BU":
+            # "So sánh chi tiêu GSM 1 tháng với VinFast 3 tháng" là so HAI ĐƠN VỊ, không
+            # phải so hai cửa sổ của cùng một chỉ số. Bảng cross-BU không có cột ratio
+            # nào (0/37), nên ép ratio_window/metric_hint=ratio sẽ lọc sạch và agent
+            # báo "câu hỏi chưa đủ rõ" cho một câu rất rõ.
+            ratio_window = None
+            if metric_hint == "ratio":
+                metric_hint = None
+        cross_both_requested = unit == "CROSS_BU" and _has_term(
+            q_norm,
+            (
+                "ca hai", "ca gsm va vinfast", "dong thoi", "dung ca",
+                "khach dung ca", "cross bu", "cross-bu", "overlap", "both",
+            ),
+        )
 
         scored: list[ScoredFeature] = []
         for f, searchable, feature_tokens in self._norm:
@@ -290,7 +335,14 @@ class SemanticLayer:
                 if is_cross and unit is None and not table_scores.get(table):
                     continue
                 # Cờ boolean không bao giờ là câu trả lời cho câu hỏi về TIỀN.
-                if f.get("aggregation") == "flag" and metric_hint == "value":
+                if (
+                    f.get("aggregation") == "flag"
+                    and metric_hint == "value"
+                    and not (
+                        cross_both_requested
+                        and f.get("name", "").startswith("is_cross_bu_active_")
+                    )
+                ):
                     continue
                 name = f.get("name", "")
             else:
@@ -298,7 +350,7 @@ class SemanticLayer:
                 if metric_hint == "count" and not has_count and "active_day" not in f.get("name", ""):
                     continue
                 if metric_hint == "value" and not any(
-                    x in f.get("name", "") for x in ("amount", "price", "discount", "battery")
+                    x in f.get("name", "") for x in ("amount", "price", "discount", "battery", "distance")
                 ):
                     continue
                 if metric_hint == "ratio" and f.get("aggregation") != "ratio":
@@ -306,8 +358,11 @@ class SemanticLayer:
                 name = f.get("name", "")
                 if compare and count_requested and not has_count:
                     continue
+                # Danh sách này phải phủ MỌI token đã đưa vào `value_requested`, nếu không
+                # câu so sánh về chỉ số đó bị lọc sạch: thêm "quang duong/distance/km" vào
+                # value_requested mà quên ở đây đã làm M02 trả về 0 feature.
                 if compare and value_requested and not any(
-                    x in name for x in ("amount", "price", "discount", "battery")
+                    x in name for x in ("amount", "price", "discount", "battery", "distance")
                 ):
                     continue
                 if _has_term(q_norm, ("cancel", "canceled", "cancelled", "huy")) and "canceled" not in name:
@@ -363,10 +418,32 @@ class SemanticLayer:
                 score += 2.0
             if compare and f.get("aggregation") == "ratio":
                 score += 2.5
+            if is_cross and cross_both_requested:
+                if name_norm.startswith("is_cross_bu_active_") and _has_term(
+                    q_norm, ("hoat dong", "active", "ca hai", "dong thoi", "dung ca")
+                ):
+                    score += 3.0
+                if name_norm.startswith("combined_spend_") and value_requested:
+                    score += 3.0
+            if is_cross and _has_term(q_norm, ("hoat dong gsm", "active gsm")):
+                if name_norm.startswith("is_active_gsm_"):
+                    score += 2.0
+            if is_cross and _has_term(q_norm, ("hoat dong vinfast", "active vinfast")):
+                if name_norm.startswith("is_active_vinfast_"):
+                    score += 2.0
+            if "vehicle_purchase" in name_norm and not _has_term(
+                q_norm, ("mua xe", "mua oto", "vehicle purchase", "don xe")
+            ):
+                score -= 5.0
+            if "txn_completed_count" in name_norm and _has_term(
+                q_norm, ("hoan thanh", "completed", "giao dich", "don")
+            ) and not _has_term(q_norm, ("mua xe", "don xe", "vehicle purchase")):
+                score += 2.0
             if "nvso" in q_norm and "nvso" in name_norm:
                 score += 3.0
             if any(term in q_norm for term in ("work order", "work_order", "wo")) and "_wo_" in name_norm:
                 score += 3.0
+            score -= _NARROWING_PENALTY * _unrequested_narrowing(name_norm, q_norm)
             if score <= 0:
                 continue
             scored.append(

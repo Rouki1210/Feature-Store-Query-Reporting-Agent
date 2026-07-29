@@ -4,6 +4,41 @@ from app.agent.contracts import GenerationRequest, RouteDecision
 from app.semantic.retriever import ScoredFeature
 
 
+def _with_state_flags(features: list[ScoredFeature]) -> list[ScoredFeature]:
+    """Bổ sung cờ trạng thái cùng bảng vào context, dù retrieval không xếp hạng chúng.
+
+    Câu "chi tiêu VinFast trung bình của khách HOẠT ĐỘNG GSM" cần hai loại cột khác
+    nhau: một CHỈ SỐ để tính và một CỜ để lọc. Retrieval xếp hạng theo độ giống câu
+    hỏi nên cột chỉ số luôn thắng, cờ rớt khỏi top-k — LLM không còn gì để lọc và
+    quay ra tính trung bình trên toàn bộ khách (sai mẫu số, SQL vẫn đúng cú pháp).
+
+    Cờ rẻ: cả catalog chỉ có 19 cột boolean, thêm vài dòng vào context không đáng kể.
+    """
+    tables = {f.table for f in features}
+    have = {f.name for f in features}
+    extra = [
+        f for f in _flag_pool()
+        if f.table in tables and f.name not in have
+    ]
+    return features + extra
+
+
+def _flag_pool() -> list[ScoredFeature]:
+    from app.semantic.retriever import get_semantic_layer
+
+    layer = get_semantic_layer()
+    return [
+        ScoredFeature(
+            name=f["name"], table=f["table"], group=f.get("group", ""),
+            description_vi=f.get("description_vi", ""), description_en=f.get("description_en", ""),
+            keywords=[], score=0.0, dtype=f.get("dtype"), unit=f.get("unit"),
+            null_meaning=f.get("null_meaning"), business_unit=f.get("business_unit"),
+        )
+        for f in layer.features
+        if f.get("dtype") == "boolean"
+    ]
+
+
 def build_feature_context(
     route: RouteDecision, features: list[ScoredFeature], join_plan: dict | None = None,
     max_chars: int = 12000,
@@ -18,6 +53,7 @@ def build_feature_context(
         or (f.table or "").lower() in plan_tables
         or (f.business_unit or "").upper() == route.business_unit.upper()
     ]
+    allowed = _with_state_flags(allowed)
     lines = [
         "Sprint 2 scope: one row per customer_id + snapshot_date.",
         "Query only the retrieved, allowlisted feature columns below.",

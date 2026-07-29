@@ -41,6 +41,8 @@ _WINDOW_QUESTION = (
 
 
 class RuleRouter:
+    _recent_window = ("gần đây", "gan day", "recent", "recently")
+    _trend = ("thay đổi", "thay doi", "xu hướng", "xu huong", "trend")
     _loyalty = ("loyalty", "vinclub")
     _window = ("daily", "l1w", "l2w", "l1m", "l2m", "l3m", "l6m", "l12m", "hôm nay", "ngày", "tuần", "tháng", "month", "week")
     _windowed_metric = ("số chuyến", "số đơn", "hoàn thành", "completed", "bị hủy", "canceled", "chi tiêu", "giá trị", "quãng đường", "hoạt động")
@@ -56,6 +58,11 @@ class RuleRouter:
     # 'raw' word-boundary phủ cả raw. / raw data / raw table.
     _raw_pii = ("raw", "pii", "số điện thoại", "phone", "email", "cccd", "địa chỉ", "họ tên", "customer name")
     _out_catalog = ("vinhomes", "vinmec", "vinpearl", "vinschool", "vinclub")
+    _unsupported = ("trả xe", "hoàn xe", "dự đoán", "du doan", "tháng sau", "thang sau", "forecast")
+    _join_request = ("ghép", "ghep", "join")
+    _unsafe_join = ("mọi snapshot", "moi snapshot", "bảng khách hàng", "bang khach hang", "ba bảng", "3 bảng")
+    _ambiguous_order = ("đặt xe", "dat xe")
+    _unfinished_order = ("chưa hoàn tất", "chua hoan tat")
     _review = ("nvso", "work order", "work_order", "wo")
     # Agent read-only: yêu cầu ghi/xóa/DDL, hoặc "trả toàn bộ cột" (SELECT *) → ngoài phạm vi.
     _unsafe = ("xóa", "xoá", "delete", "drop", "truncate", "insert")
@@ -103,6 +110,18 @@ class RuleRouter:
                 reason="BU ngoài catalog Sprint 1.",
                 refusal_code=RefusalCode.out_of_catalog,
             )
+        if _hit(q, self._unsupported) or (_hit(q, self._join_request) and _hit(q, self._unsafe_join)):
+            return original, RouteDecision(
+                intent=IntentType.out_of_scope, confidence=0.98,
+                reason="Yêu cầu này không thuộc feature snapshot hoặc vượt chính sách join an toàn.",
+                refusal_code=RefusalCode.irrelevant,
+            )
+        if _hit(q, self._ambiguous_order) and _hit(q, self._unfinished_order):
+            return original, RouteDecision(
+                intent=IntentType.clarify, confidence=0.9,
+                reason="Trạng thái đơn xe chưa có định nghĩa feature rõ ràng.",
+                clarifying_question="Bạn muốn xem đơn chưa hoàn tất theo trạng thái nghiệp vụ nào?",
+            )
         if _hit(q, self._review):
             return original, RouteDecision(
                 intent=IntentType.clarify, confidence=0.9,
@@ -120,7 +139,7 @@ class RuleRouter:
         vf = bool(re.search(r"\b(vinfast|vf|xe điện|phụ kiện|đơn xe)\b", q) or _hit(q, self._owner))
         cross_bu = (gsm and vf) or _hit(q, self._cross_bu) or (gsm and _hit(q, self._owner))
         if cross_bu:
-            if _hit(q, self._windowed_metric) and not _hit(q, self._window):
+            if _hit(q, self._windowed_metric) and not (_hit(q, self._window) or _hit(q, self._recent_window)):
                 return original, RouteDecision(
                     intent=IntentType.clarify, business_unit="CROSS_BU", confidence=0.7,
                     reason="Thiếu time window cho metric xuyên đơn vị.",
@@ -140,14 +159,14 @@ class RuleRouter:
                 reason="Câu hỏi ngoài phạm vi dữ liệu feature store Sprint 2 (chỉ GSM/VinFast).",
                 refusal_code=RefusalCode.irrelevant,
             )
-        if bu and _hit(q, self._windowed_metric) and not _hit(q, self._window):
+        if bu and _hit(q, self._windowed_metric) and not (_hit(q, self._window) or _hit(q, self._recent_window)):
             return original, RouteDecision(
                 intent=IntentType.clarify, confidence=0.7,
                 reason="Thiếu time window cho metric dùng feature snapshot.",
                 clarifying_question=_WINDOW_QUESTION,
                 known_slots={"business_unit": bu}, missing_slots=["window"],
             )
-        if _hit(q, self._cmp):
+        if _hit(q, self._cmp) or _hit(q, self._trend):
             intent = IntentType.window_compare
         elif _hit(q, self._agg):
             intent = IntentType.aggregate

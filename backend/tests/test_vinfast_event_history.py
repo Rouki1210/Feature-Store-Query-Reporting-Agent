@@ -40,10 +40,17 @@ def db():
 
 
 def _require_priv(db, table: str, priv: str):
+    """Quyền bảng KHÔNG đủ: thiếu USAGE trên schema thì query vẫn lỗi.
+
+    `has_table_privilege` trả TRUE cả khi schema `raw` bị REVOKE USAGE — kiểm mỗi
+    cái đó thì test không skip mà nổ giữa chừng, và nó làm hỏng luôn connection
+    module-scope khiến các test sau báo lỗi lạc đề.
+    """
     conn, oids = db
+    usable = conn.execute(text("SELECT has_schema_privilege(current_user, 'raw', 'USAGE')")).scalar()
     ok = conn.execute(text("SELECT has_table_privilege(current_user, :oid, :p)"),
                       {"oid": oids[table], "p": priv}).scalar()
-    if not ok:
+    if not (usable and ok):
         pytest.skip(f"User runtime không có {priv} trên raw (đúng thiết kế); chạy bằng admin.")
     return conn
 

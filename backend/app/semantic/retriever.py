@@ -303,6 +303,13 @@ class SemanticLayer:
                 "khach dung ca", "cross bu", "cross-bu", "overlap", "both",
             ),
         )
+        per_bu_breakdown = unit == "CROSS_BU" and _has_term(
+            q_norm,
+            (
+                "theo tung business unit", "tung business unit", "moi business unit",
+                "by business unit", "each business unit",
+            ),
+        )
 
         scored: list[ScoredFeature] = []
         for f, searchable, feature_tokens in self._norm:
@@ -418,6 +425,12 @@ class SemanticLayer:
                 score += 2.0
             if compare and f.get("aggregation") == "ratio":
                 score += 2.5
+            if is_cross and per_bu_breakdown:
+                target_window = window_hint or "all"
+                if name_norm in {f"gsm_spend_{target_window}", f"vinfast_spend_{target_window}"}:
+                    score += 8.0
+                elif name_norm.startswith("combined_spend_"):
+                    score -= 3.0
             if is_cross and cross_both_requested:
                 if name_norm.startswith("is_cross_bu_active_") and _has_term(
                     q_norm, ("hoat dong", "active", "ca hai", "dong thoi", "dung ca")

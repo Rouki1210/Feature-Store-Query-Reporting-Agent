@@ -54,6 +54,8 @@ class RuleRouter:
     _cross_bu = (
         "cả hai", "ca hai", "đồng thời", "dong thoi", "overlap", "khách chung",
         "khach chung", "vừa đi gsm vừa mua vinfast", "vua di gsm vua mua vinfast",
+        "theo từng business unit", "từng business unit", "mỗi business unit",
+        "by business unit", "each business unit",
     )
     # 'raw' word-boundary phủ cả raw. / raw data / raw table.
     _raw_pii = ("raw", "pii", "số điện thoại", "phone", "email", "cccd", "địa chỉ", "họ tên", "customer name")

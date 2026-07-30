@@ -8,7 +8,7 @@ from app.agent.llm_client import JSONLLM
 
 # Bump khi sửa SYSTEM_PROMPT — nhãn cho eval.query_test_run.prompt_version (so before/after).
 # Mỗi lần bump phải thêm một dòng vào prompts/CHANGELOG.md kèm số eval trước/sau.
-PROMPT_VERSION = "sprint2-v6"
+PROMPT_VERSION = "sprint2-v7"
 
 SYSTEM_PROMPT = """You are the read-only SQL Generator for the Sprint 2 Feature Store.
 
@@ -68,6 +68,11 @@ MANDATORY RULES
     is permitted only when join_plan is present:
    use exactly its tables, join type, and join keys. Never invent join keys, use CROSS JOIN,
    omit ON, or hide a join inside a CTE/subquery. WITH...SELECT is allowed but at most two CTEs.
+   When the user asks for revenue and customer count "by/for each business unit", return
+   exactly `business_unit, customer_count, total_revenue` with one `UNION ALL` branch for
+   GSM and one for VINFAST. Use `COUNT(*) FILTER (WHERE is_active_<bu>_<window>)` and
+   `SUM(<bu>_spend_<window>)` in each branch. Do not collapse the two rows with
+   `combined_spend_*`. If no time window is stated, use the `_all` features in both branches.
 13. assumptions may state only a short, checkable data limitation or scope assumption for a
    partial answer. They never excuse missing SQL predicates, missing features, or an unsupported join.
 14. Use boolean activity/ownership flags when the question names that state. Do not infer an

@@ -6,7 +6,7 @@ from typing import Any, Callable
 
 from sqlalchemy import text
 
-from app.agent.context import generation_request
+from app.agent.context import context_features, generation_request
 from app.agent.contracts import IntentType, NarrationInput, PipelineContext, RepairRequest
 from app.agent.generator import SQLGenerator
 from app.agent.join_planner import JoinPlan, JoinPlanner
@@ -145,7 +145,7 @@ class AgentPipeline:
             mark("join_planner", "app.agent.join_planner.JoinPlanner", "completed",
                  {"intent": route.intent.value}, plan_dict)
         req = generation_request(original, route, scored, plan_dict)
-        allowed = {f.name for f in scored}
+        allowed = {f.name for f in context_features(route, scored, plan_dict)}
         generation_started = time.perf_counter()
         try:
             generation = self.generator.generate(req)

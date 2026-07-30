@@ -39,10 +39,9 @@ def _flag_pool() -> list[ScoredFeature]:
     ]
 
 
-def build_feature_context(
+def context_features(
     route: RouteDecision, features: list[ScoredFeature], join_plan: dict | None = None,
-    max_chars: int = 12000,
-) -> str:
+) -> list[ScoredFeature]:
     # Lọc theo BU của route, TRỪ khi join plan đã chốt bảng: plan cross-BU gồm hai bảng
     # gắn nhãn GSM/VINFAST trong khi route.business_unit là CROSS_BU, lọc tiếp sẽ xoá
     # sạch context và generator không còn cột nào để dùng.
@@ -53,7 +52,14 @@ def build_feature_context(
         or (f.table or "").lower() in plan_tables
         or (f.business_unit or "").upper() == route.business_unit.upper()
     ]
-    allowed = _with_state_flags(allowed)
+    return _with_state_flags(allowed)
+
+
+def build_feature_context(
+    route: RouteDecision, features: list[ScoredFeature], join_plan: dict | None = None,
+    max_chars: int = 12000,
+) -> str:
+    allowed = context_features(route, features, join_plan)
     lines = [
         "Sprint 2 scope: one row per customer_id + snapshot_date.",
         "Query only the retrieved, allowlisted feature columns below.",

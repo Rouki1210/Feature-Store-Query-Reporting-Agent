@@ -94,7 +94,12 @@ def _answer_slots(message: str) -> dict[str, str | int]:
 
 
 def _merged_question(question: str, slots: dict[str, str | int]) -> str:
-    values = [str(slots[name]) for name in ("business_unit", "window", "top_n") if name in slots]
+    values = [
+        "cả hai" if name == "business_unit" and slots[name] == "CROSS_BU"
+        else f"top {slots[name]}" if name == "top_n"
+        else str(slots[name])
+        for name in ("business_unit", "window", "top_n") if name in slots
+    ]
     return " ".join([question, *values]).strip()
 
 

@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
-import type { QueryResult } from "../types";
-import { chartable, fmt, scalar } from "../lib/table";
+import type { QueryResult, ResultShape } from "../types";
+import { fmt } from "../lib/table";
 
 const ResultChart = lazy(() =>
   import("./ResultChart").then((m) => ({ default: m.ResultChart })),
@@ -48,17 +48,25 @@ function Table({ result }: { result: QueryResult }) {
 }
 
 // Chỉ hiển thị kết quả (bento / bảng / chart). Actions + toggle do Message giữ.
-export function ResultView({ result, view }: { result: QueryResult; view: "table" | "chart" }) {
-  const s = scalar(result);
-  if (s != null) return <BentoNumber label={result.columns[0]} value={s} />;
+export function ResultView({
+  result,
+  shape,
+  view,
+}: {
+  result: QueryResult;
+  shape: ResultShape;
+  view: "table" | "chart";
+}) {
   if (result.rows.length === 0)
     return <p className="text-sm text-text-secondary">Không có dòng nào khớp.</p>;
-  if (view === "chart" && chartable(result))
+  if (shape === "scalar")
+    return <BentoNumber label={result.columns[0]} value={result.rows[0][0] as number} />;
+  if (view === "chart" && (shape === "category" || shape === "time_series"))
     return (
       <Suspense
         fallback={<div className="py-8 text-center text-xs text-text-secondary">Đang tải biểu đồ…</div>}
       >
-        <ResultChart result={result} />
+        <ResultChart result={result} shape={shape} />
       </Suspense>
     );
   return <Table result={result} />;

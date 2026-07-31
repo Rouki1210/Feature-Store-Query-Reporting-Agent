@@ -1,3 +1,4 @@
+
 """Deterministic bilingual semantic retriever for the canonical inventory."""
 from __future__ import annotations
 
@@ -24,19 +25,82 @@ _TABLE_HINTS = {
     ),
 }
 
+# "30 ngày gần nhất", "7 ngày qua", "90 ngay" — cách nói phổ biến nhất mà bảng alias
+# cố định không phủ nổi. Chỉ nhận khi con số RẤT GẦN một cửa sổ có thật (±10%): đủ rộng
+# cho mọi cách nói một cửa sổ ĐANG CÓ (7/14/30/90/180/365 ngày, 4 tuần ≈ 1 tháng,
+# 12 tuần ≈ 3 tháng) nhưng từ chối cái mơ hồ — "5 tháng" (150 ngày) lệch l6m 20%, "60
+# ngày" nằm giữa l1m và l3m. Thà hỏi lại còn hơn tự làm tròn rồi trả sai kỳ.
+_WINDOW_TOLERANCE = 0.1
+_WINDOW_DAYS = {"daily": 1, "l1w": 7, "l2w": 14, "l1m": 30, "l3m": 90, "l6m": 180, "l12m": 365}
+_UNIT_DAYS = {
+    "ngay": 1, "tuan": 7, "thang": 30, "nam": 365,
+    "day": 1, "week": 7, "month": 30, "year": 365,
+}
+# Cả hai ngôn ngữ: "30 ngày" và "last 30 days" phải cho cùng kết quả. Số nhiều tiếng
+# Anh gộp bằng `s?` để không phải liệt kê hai lần.
+_NUMERIC_WINDOW = re.compile(r"(\d+)\s*(ngay|tuan|thang|nam|days?|weeks?|months?|years?)\b")
+# Alias đứng NGAY SAU một con số là mảnh của cụm có số, không phải cửa sổ riêng:
+# "5 tháng gần nhất" chứa alias "tháng gần nhất" (l1m) nhưng nghĩa là 5 tháng, không
+# phải 1 tháng. Chỉ áp cho alias — hit numeric vốn bắt đầu bằng chính con số đó.
+_DIGIT_BEFORE = re.compile(r"\d+\s*$")
+# Với chỉ số "tuổi" (days_since_*), con số ngày là NGƯỠNG trên giá trị cột, KHÔNG phải
+# cửa sổ feature. Golden H10: "giao dịch hoàn thành ĐẦU TIÊN trong vòng 30 ngày" phải ra
+# `days_since_first_completed_txn_days_l12m <= 30` — khách mới. Nếu đọc "30 ngày" thành
+# cửa sổ l1m thì được `..._l1m`, cột này ≤30 với BẤT KỲ ai có giao dịch tháng qua, tức
+# mất hẳn nghĩa "khách mới".
+_AGE_METRIC = (
+    "dau tien", "lan dau", "chua quay lai", "chua tro lai", "bao lau", "lau nhat",
+    "ke tu", "days since", "khach moi",
+)
+
+
+def _numeric_windows(q_norm: str) -> list[tuple[int, int, str]]:
+    """(vị trí, độ dài, cửa sổ) cho mỗi cụm `N ngày|tuần|tháng|năm` (VI hoặc EN)."""
+    if any(term in q_norm for term in _AGE_METRIC):
+        return []
+    hits: list[tuple[int, int, str]] = []
+    for match in _NUMERIC_WINDOW.finditer(q_norm):
+        days = int(match.group(1)) * _UNIT_DAYS[match.group(2).rstrip("s")]
+        window = min(_WINDOW_DAYS, key=lambda name: abs(_WINDOW_DAYS[name] - days))
+        if abs(_WINDOW_DAYS[window] - days) <= _WINDOW_TOLERANCE * days:
+            hits.append((match.start(), match.end() - match.start(), window))
+    return hits
+
+
+def has_time_reference(q_norm: str) -> bool:
+    """Router có đủ mốc thời gian để chạy, hay phải hỏi lại?
+
+    Đủ trong ĐÚNG hai trường hợp:
+      1. Phân giải được về một cửa sổ có thật ("30 ngày" → l1m).
+      2. Con số là NGƯỠNG trên chỉ số tuổi ("đầu tiên trong vòng 30 ngày" → golden H10
+         dùng `..._l12m <= 30`), lúc đó không cần cửa sổ nào.
+
+    KHÔNG đủ khi con số không khớp cửa sổ nào: "8 tuần" (56 ngày) nằm giữa l1m và l3m,
+    "60 ngày" cũng vậy. Nhận những câu đó là "đã có mốc" thì router bỏ qua clarify, và
+    retrieval không có hint sẽ mặc định lấy cột rộng nhất — user hỏi 8 tuần, agent trả
+    luỹ kế mà không báo. Đó đúng là bug ban đầu, chỉ đổi đường vào.
+    """
+    if SemanticLayer._window_hints(q_norm):
+        return True
+    return bool(_NUMERIC_WINDOW.search(q_norm)) and any(
+        term in q_norm for term in _AGE_METRIC
+    )
+
+
+# CHỈ những cửa sổ CÓ THẬT trong inventory (daily/l1w/l2w/l1m/l3m/l6m/l12m/all).
+# `l4w`, `l2m`, `l8w` từng có ở đây nhưng KHÔNG feature nào dùng chúng, nên chúng chỉ
+# sinh hint rỗng: "4 tuần" ra `l4w` rồi bị lọc sạch. Số ngày tương đương do
+# `_numeric_windows` quy về cửa sổ thật (4 tuần ≈ 28 ngày → l1m).
 _WINDOW_ALIASES = {
     "daily": ("daily", "hôm nay", "hom nay", "trong ngày", "today"),
     "l1w": ("l1w", "1 tuần", "1 tuan", "tuần gần nhất", "last 1 week", "last week"),
     "l2w": ("l2w", "2 tuần", "2 tuan", "last 2 weeks"),
-    "l4w": ("l4w", "4 tuần", "4 tuan", "last 4 weeks"),
     "l1m": (
         "l1m", "1 tháng", "1 thang", "tháng gần nhất", "tháng trước", "thang truoc",
         "last 1 month", "last month",
     ),
-    "l2m": ("l2m", "2 tháng", "2 thang", "last 2 months"),
     "l3m": ("l3m", "3 tháng", "3 thang", "last 3 months"),
     "l6m": ("l6m", "6 tháng", "6 thang", "last 6 months"),
-    "l8w": ("l8w", "8 tuần", "8 tuan", "last 8 weeks"),
     "l12m": ("l12m", "12 tháng", "12 thang", "last 12 months"),
     # Luỹ kế: "tổng cộng bao nhiêu xe đã bàn giao" phải ra cột _all, không phải _l1m.
     "all": (
@@ -83,6 +147,101 @@ def _strip_accents(text: str) -> str:
 
 def _tokens(text: str) -> set[str]:
     return {t for t in re.split(r"[^a-z0-9_]+", _strip_accents(text)) if len(t) >= 2}
+
+
+# Phủ định phải ĐẢO filter trạng thái, không phải chỉ bỏ qua nó. "Số đơn VinFast CHƯA
+# hoàn thành" mà vẫn đòi tên chứa "completed" thì agent trả về đúng cái ngược lại với
+# câu hỏi — kiểu sai tệ nhất, vì con số trông hoàn toàn hợp lý và user không có cách nào
+# nhận ra ngoài việc đọc SQL.
+_NEGATION_CUES = frozenset({"chua", "khong", "chang", "chua he", "not", "non", "never"})
+_NEGATION_LOOKBEHIND = 24
+# Nhóm token tên cột đi cùng nhau: phủ định "hoàn thành" phải loại cả `finished`.
+_STATUS_GROUPS: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
+    (("completed", "finished"), ("completed", "finished", "hoan thanh", "hoan tat")),
+    (("canceled",), ("canceled", "cancelled", "cancel", "huy")),
+    (("delivered",), ("delivered", "ban giao", "nhan xe")),
+)
+
+
+def _is_negated(q_norm: str, term: str) -> bool:
+    """`term` có đứng ngay sau một từ phủ định không?"""
+    start = q_norm.find(term)
+    while start != -1:
+        prefix = q_norm[max(0, start - _NEGATION_LOOKBEHIND):start].split()
+        if set(prefix[-2:]) & _NEGATION_CUES:
+            return True
+        start = q_norm.find(term, start + 1)
+    return False
+
+
+# Câu trả lời clarify về trạng thái phải RÀNG BUỘC vào token tên cột. Nối prose vào câu
+# hỏi là không đủ: "... đã bàn giao" thêm vào "Số đơn VinFast trong 1 tháng" vẫn để
+# `txn_completed_count_l1m` thắng bằng keyword — trả sai metric ngay sau khi user vừa
+# chọn đúng trạng thái.
+_REQUIRED_STATUS: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
+    (("ban giao", "nhan xe", "delivered"), ("delivered", "handover")),
+)
+
+
+def _required_status_tokens(q_norm: str) -> tuple[tuple[str, ...], ...]:
+    return tuple(
+        tokens
+        for terms, tokens in _REQUIRED_STATUS
+        if any(term in q_norm and not _is_negated(q_norm, term) for term in terms)
+    )
+
+
+def _negated_status_tokens(q_norm: str) -> frozenset[str]:
+    """Token tên cột bị phủ định ⇒ feature chứa chúng phải bị LOẠI, không phải ưu tiên."""
+    return frozenset(
+        token
+        for tokens, terms in _STATUS_GROUPS
+        if any(_is_negated(q_norm, term) for term in terms)
+        for token in tokens
+    )
+
+
+_WINDOW_SUFFIX = re.compile(r"_(daily|l1w|l2w|l4w|l1m|l2m|l3m|l6m|l8w|l12m|all)$")
+
+
+def _stem_of(name: str) -> str:
+    return _WINDOW_SUFFIX.sub("", name)
+
+
+# Câu hỏi không nêu kỳ ⇒ hỏi về trạng thái tổng thể của khách, không phải hôm nay.
+# Nên đại diện của mỗi stem là cửa sổ RỘNG NHẤT có thật; `daily` gần như không bao giờ
+# là ý người hỏi. Không có bảng này thì đại diện rơi vào cửa sổ đầu bảng chữ cái
+# ("daily") và câu "khách lâu nhất chưa giao dịch" trả về số của đúng một ngày.
+_WINDOW_PREFERENCE = ("all", "l12m", "l6m", "l3m", "l1m", "l2w", "l1w", "l4w", "l2m", "l8w", "daily")
+
+
+def _window_rank(name: str) -> int:
+    match = _WINDOW_SUFFIX.search(name)
+    window = match.group(1) if match else None
+    return _WINDOW_PREFERENCE.index(window) if window in _WINDOW_PREFERENCE else len(_WINDOW_PREFERENCE)
+
+
+def _one_window_per_stem(scored: list["ScoredFeature"]) -> list["ScoredFeature"]:
+    """Câu hỏi không nêu cửa sổ ⇒ mỗi stem chỉ giữ MỘT đại diện trong top-k.
+
+    Mỗi stem có tới 5-8 cửa sổ; khi câu hỏi không nêu cửa sổ nào thì chúng điểm bằng
+    nhau và chiếm trọn top-k — context 8 dòng nhưng chỉ nói về 2 khái niệm, còn cột
+    đúng thì rơi ra ngoài. Giữ một đại diện mỗi stem trước, phần dư xếp sau để LLM
+    vẫn đổi được cửa sổ nếu cần.
+    """
+    by_stem: dict[str, list[ScoredFeature]] = {}
+    for item in scored:                      # scored đã sắp giảm dần theo điểm
+        by_stem.setdefault(_stem_of(item.name), []).append(item)
+    best: list[ScoredFeature] = []
+    rest: list[ScoredFeature] = []
+    for group in by_stem.values():
+        top_score = group[0].score
+        tied = [item for item in group if item.score == top_score]
+        chosen = min(tied, key=lambda item: _window_rank(item.name))
+        best.append(chosen)
+        rest.extend(item for item in group if item is not chosen)
+    best.sort(key=lambda item: (-item.score, item.name))
+    return best + rest
 
 
 def _unrequested_narrowing(name_norm: str, q_norm: str) -> int:
@@ -212,19 +371,34 @@ class SemanticLayer:
 
     @staticmethod
     def _window_hints(q_norm: str) -> list[str]:
-        matches: list[tuple[int, str]] = []
-        for window, aliases in _WINDOW_ALIASES.items():
-            positions = [
-                q_norm.find(_strip_accents(alias))
-                for alias in aliases
-                if _strip_accents(alias) in q_norm
-            ]
-            if positions:
-                matches.append((min(positions), window))
-        if any(alias in q_norm for alias in ("gan day", "recent", "recently")):
-            matches.append((q_norm.find("gan day") if "gan day" in q_norm else 0, "l1m"))
-        matches.sort()
-        return [window for _, window in matches]
+        """Các cửa sổ user nêu, theo thứ tự xuất hiện.
+
+        MỘT cụm chỉ được nêu MỘT cửa sổ. Trước đây "4 tuần gần nhất" sinh ba hint
+        chồng nhau — `l4w` ("4 tuan"), `l1w` ("tuan gan nhat") và `l1m` (28 ngày ≈ 30)
+        — rồi `matches.sort()` chọn theo thứ tự chữ cái, nên cửa sổ thắng là chuyện
+        may rủi và `ratio_window` ghép ra cặp không tồn tại ("l1m_vs_l4w").
+        """
+        spans: list[tuple[int, int, str]] = [
+            (start, len(needle), window)
+            for window, aliases in _WINDOW_ALIASES.items()
+            for needle in {_strip_accents(alias) for alias in aliases}
+            if (start := q_norm.find(needle)) != -1
+            and not _DIGIT_BEFORE.search(q_norm[:start])
+        ]
+        spans.extend(_numeric_windows(q_norm))
+        if not spans and any(alias in q_norm for alias in ("gan day", "recent", "recently")):
+            return ["l1m"]
+        # Cụm dài nhất bắt đầu sớm nhất thắng; mọi cụm chồng lấn phía sau bị bỏ.
+        spans.sort(key=lambda span: (span[0], -span[1]))
+        hints: list[str] = []
+        consumed = -1
+        for start, length, window in spans:
+            if start < consumed:
+                continue
+            consumed = start + length
+            if window not in hints:
+                hints.append(window)
+        return hints
 
     @staticmethod
     def _metric_hint(q_norm: str) -> str | None:
@@ -235,7 +409,7 @@ class SemanticLayer:
         if _has_term(
             q_norm,
             (
-                "so chuyen", "so don", "bao nhieu", "count", "frequency",
+                "so chuyen", "so don", "so giao dich", "so luong giao dich", "bao nhieu", "count", "frequency",
                 "number of", "trip", "trips", "order", "orders",
             ),
         ):
@@ -275,10 +449,18 @@ class SemanticLayer:
             ),
         )
         discount_requested = _has_term(q_norm, ("discount", "chiet khau", "giam gia"))
+        negated_status = _negated_status_tokens(q_norm)
+        required_status = _required_status_tokens(q_norm)
+        # "So sánh đơn xe hoàn tất với khách đã nhận xe" cần cả buyer lẫn owner.
+        # Ép vế "đã nhận xe" lên mọi feature sẽ làm buyer biến mất trước khi xếp hạng.
+        if self._is_compare(q_norm) and _has_term(
+            q_norm, ("completed", "finished", "hoan thanh", "hoan tat")
+        ):
+            required_status = ()
         count_requested = not value_requested and _has_term(
             q_norm,
             (
-                "so chuyen", "so don", "bao nhieu", "count", "frequency",
+                "so chuyen", "so don", "so giao dich", "so luong giao dich", "bao nhieu", "count", "frequency",
                 "number of", "trip", "trips", "order", "orders",
             ),
         )
@@ -326,6 +508,18 @@ class SemanticLayer:
                 continue
             if ratio_window and feature_window != ratio_window:
                 continue
+            # Trạng thái user nêu rõ (kể cả khi vừa chọn qua chip clarify) là ràng buộc
+            # CỨNG: áp cho cả cờ boolean, vì "đã bàn giao" mà trả `is_vehicle_buyer` thì
+            # cũng sai như trả `txn_completed_count`.
+            allows_owner_for_handover = (
+                f.get("name") == "is_vehicle_owner"
+                and any("delivered" in tokens or "handover" in tokens for tokens in required_status)
+            )
+            if not allows_owner_for_handover and any(
+                not any(token in f.get("name", "") for token in tokens)
+                for tokens in required_status
+            ):
+                continue
             # Cờ boolean (is_vehicle_owner, is_cross_bu_active…) và cột cross-BU không
             # mang token count/completed trong tên — phép đếm nằm ở SQL. Bộ filter
             # "tên phải chứa X" bên dưới sẽ loại sạch chúng, nên miễn trừ ở đây.
@@ -348,6 +542,16 @@ class SemanticLayer:
                     and not (
                         cross_both_requested
                         and f.get("name", "").startswith("is_cross_bu_active_")
+                    )
+                    and not (
+                        is_cross
+                        and f.get("name", "").startswith("is_active_gsm_")
+                        and _has_term(q_norm, ("hoat dong gsm", "active gsm"))
+                    )
+                    and not (
+                        is_cross
+                        and f.get("name", "").startswith("is_active_vinfast_")
+                        and _has_term(q_norm, ("hoat dong vinfast", "active vinfast"))
                     )
                 ):
                     continue
@@ -372,10 +576,21 @@ class SemanticLayer:
                     x in name for x in ("amount", "price", "discount", "battery", "distance")
                 ):
                     continue
-                if _has_term(q_norm, ("cancel", "canceled", "cancelled", "huy")) and "canceled" not in name:
+                # Trạng thái bị phủ định: LOẠI feature mang token đó. Phải đứng TRƯỚC
+                # hai filter "đòi token" bên dưới, vì chính chúng biến "chưa hoàn thành"
+                # thành "hoàn thành".
+                if negated_status and any(token in name for token in negated_status):
                     continue
-                if _has_term(q_norm, ("completed", "finished", "hoan thanh")) and not any(
-                    x in name for x in ("completed", "finished")
+                if (
+                    "canceled" not in negated_status
+                    and _has_term(q_norm, ("cancel", "canceled", "cancelled", "huy"))
+                    and "canceled" not in name
+                ):
+                    continue
+                if (
+                    "completed" not in negated_status
+                    and _has_term(q_norm, ("completed", "finished", "hoan thanh"))
+                    and not any(x in name for x in ("completed", "finished"))
                 ):
                     continue
                 if discount_requested and "discount" not in name:
@@ -444,10 +659,6 @@ class SemanticLayer:
             if is_cross and _has_term(q_norm, ("hoat dong vinfast", "active vinfast")):
                 if name_norm.startswith("is_active_vinfast_"):
                     score += 2.0
-            if "vehicle_purchase" in name_norm and not _has_term(
-                q_norm, ("mua xe", "mua oto", "vehicle purchase", "don xe")
-            ):
-                score -= 5.0
             if "txn_completed_count" in name_norm and _has_term(
                 q_norm, ("hoan thanh", "completed", "giao dich", "don")
             ) and not _has_term(q_norm, ("mua xe", "don xe", "vehicle purchase")):
@@ -478,6 +689,8 @@ class SemanticLayer:
         scored.sort(key=lambda item: (-item.score, item.name))
         if not scored:
             return []
+        if not window_hints:
+            scored = _one_window_per_stem(scored)
         return scored[: max(1, top_k)]
 
 

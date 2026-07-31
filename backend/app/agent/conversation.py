@@ -15,12 +15,16 @@ import unicodedata
 import re
 from dataclasses import dataclass
 
+from app.agent.breakdown import BreakdownPlanner, strip_metric_phrases, strip_phrases
+from app.agent.router import RuleRouter
 from app.config import get_settings
 from app.models.schemas import AskResponse
 
 
 @dataclass
 class PendingState:
+    # Câu GỐC, không bao giờ nối thêm: mỗi lượt ghép lại từ đây + toàn bộ slot đã
+    # biết. Lưu câu đã ghép sẽ làm câu hỏi dài thêm mỗi lượt và lặp "cả hai".
     original_question: str
     expires_at: float
     known_slots: dict[str, str | int] | None = None
@@ -28,6 +32,8 @@ class PendingState:
 
 
 _STORE: dict[str, PendingState] = {}
+_BREAKDOWNS = BreakdownPlanner()
+ORDER_STATUS_OPTIONS = ({"value": "Đã hủy", "label": "Đã hủy"},)
 
 # Từ hủy: xóa pending, không chạy query. Không gồm "không" (mơ hồ — "không biết"
 # phải giữ pending và hỏi lại, xem spec §13).
@@ -90,15 +96,58 @@ def _answer_slots(message: str) -> dict[str, str | int]:
     match = re.fullmatch(r"top\s+(\d+)", text)
     if match:
         slots["top_n"] = int(match.group(1))
+    dimension = _BREAKDOWNS.dimension_from_answer(message)
+    if dimension:
+        slots["breakdown_dimension"] = dimension
+    if text in {"independent", "nhom doc lap", "doc lap"}:
+        slots["group_semantics"] = "independent"
+    elif text in {"exclusive", "nhom loai tru", "loai tru"}:
+        slots["group_semantics"] = "exclusive"
+    if text in {
+        "so luong khach hang", "tong doanh thu", "so giao dich",
+        "customer count", "total revenue", "transaction count",
+    }:
+        slots["metric"] = message
+    # Chỉ nhận lựa chọn thay thế có cùng grain giao dịch. "Đã bàn giao" là vehicle
+    # handover của VinFast, không phải trạng thái giao dịch GSM.
+    order_status = {
+        "da huy": "đã hủy", "huy": "đã hủy", "canceled": "đã hủy",
+    }.get(text)
+    if order_status:
+        slots["order_status"] = order_status
     return slots
 
 
 def _merged_question(question: str, slots: dict[str, str | int]) -> str:
+    if "metric" in slots:
+        question = strip_metric_phrases(question)
+    if "order_status" in slots:
+        # Giữ lại "chưa hoàn thành" thì router lại clarify chính câu vừa được trả lời.
+        question = strip_phrases(question, RuleRouter._unfinished_order)
+    dimension_phrases = {
+        "none": "không chia nhóm",
+        "business_unit": "theo business unit",
+        "service_type": "theo dịch vụ",
+        "customer_state": "theo trạng thái khách hàng",
+        "window": "theo cửa sổ thời gian",
+        "snapshot_date": "theo snapshot_date",
+    }
+    semantics = {
+        "independent": "nhóm độc lập",
+        "exclusive": "nhóm loại trừ",
+    }
     values = [
         "cả hai" if name == "business_unit" and slots[name] == "CROSS_BU"
         else f"top {slots[name]}" if name == "top_n"
+        else dimension_phrases.get(str(slots[name]), str(slots[name]))
+        if name == "breakdown_dimension"
+        else semantics.get(str(slots[name]), str(slots[name]))
+        if name == "group_semantics"
         else str(slots[name])
-        for name in ("business_unit", "window", "top_n") if name in slots
+        for name in (
+            "business_unit", "window", "top_n", "breakdown_dimension",
+            "group_semantics", "metric", "order_status",
+        ) if name in slots
     ]
     return " ".join([question, *values]).strip()
 
@@ -119,6 +168,8 @@ def ask_with_context(pipeline, session_id: str, message: str) -> AskResponse:
         )
 
     transition = {"from": "none", "to": "executing", "resolved_slot": None}
+    slots: dict[str, str | int] = {}
+    base = message
     if pending and _is_short_answer(message):
         parsed = _answer_slots(message)
         expected = set(pending.missing_slots)
@@ -131,10 +182,11 @@ def ask_with_context(pipeline, session_id: str, message: str) -> AskResponse:
                     "Bạn hãy trả lời: " + ", ".join(sorted(expected)) + "."
                 ),
                 known_slots=pending.known_slots or {}, missing_slots=sorted(expected),
+                clarification_options=list(ORDER_STATUS_OPTIONS) if expected == {"order_status"} else [],
             )
-        slots = dict(pending.known_slots or {})
-        slots.update(parsed)
-        effective = _merged_question(pending.original_question, slots)
+        slots = {**(pending.known_slots or {}), **parsed}
+        base = pending.original_question
+        effective = _merged_question(base, slots)
         transition = {"from": "pending", "to": "executing", "resolved_slot": resolved}
     else:
         effective = message
@@ -146,7 +198,7 @@ def ask_with_context(pipeline, session_id: str, message: str) -> AskResponse:
     if resp.status == "clarify":
         ttl = get_settings().conversation_ttl_seconds
         _STORE[session_id] = PendingState(
-            effective, now + ttl, dict(resp.known_slots), tuple(resp.missing_slots),
+            base, now + ttl, {**slots, **resp.known_slots}, tuple(resp.missing_slots),
         )
     else:  # ok / out_of_scope / error → câu hỏi đã xong
         _clear(session_id)

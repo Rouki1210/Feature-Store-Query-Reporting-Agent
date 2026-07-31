@@ -3,6 +3,7 @@
 Bug cũ: 'earn' ⊂ 'learn', 'wo' ⊂ 'word', 'phone' ⊂ 'iphone' → refuse oan.
 """
 from app.agent.contracts import IntentType, RefusalCode
+from app.agent.breakdown import BreakdownPlanner
 from app.agent.router import RuleRouter
 import pytest
 
@@ -58,6 +59,12 @@ def test_window_compare_intent_via_vs():
     assert d.intent == IntentType.window_compare
 
 
+def test_per_customer_list_does_not_trigger_breakdown_clarification():
+    assert not BreakdownPlanner().needs_dimension_choice(
+        "Mức chi tiêu GSM gần đây đang thay đổi thế nào theo từng khách", []
+    )
+
+
 # --- T2: lọc câu lạc đề (off-domain) → out_of_scope, không clarify BU ---
 def test_weather_is_out_of_scope():
     d = _decide("thời tiết hôm nay thế nào")
@@ -81,6 +88,25 @@ def test_valid_bu_question_not_filtered():
     d = _decide("GSM có bao nhiêu chuyến hoàn thành l1m")
     assert d.intent != IntentType.out_of_scope
     assert d.business_unit == "GSM"
+
+
+@pytest.mark.parametrize("question, business_unit", [
+    ("Số giao dịch GSM không hoàn thành trong 1 tháng", "GSM"),
+    ("Số giao dịch VinFast chưa hoàn thành trong 1 tháng", "VINFAST"),
+])
+def test_unfinished_status_keeps_business_unit_and_only_requests_canceled(question, business_unit):
+    d = _decide(question)
+    assert d.intent == IntentType.clarify
+    assert d.business_unit == business_unit
+    assert d.known_slots == {"business_unit": business_unit}
+    assert d.missing_slots == ["order_status"]
+    assert "đã hủy" in (d.clarifying_question or "").lower()
+    assert "bàn giao" not in (d.clarifying_question or "").lower()
+
+
+def test_unfinished_cross_bu_is_not_silently_merged():
+    d = _decide("Số giao dịch GSM và VinFast không hoàn thành trong 1 tháng")
+    assert d.intent == IntentType.out_of_scope
 
 
 @pytest.mark.parametrize("question, intent", [

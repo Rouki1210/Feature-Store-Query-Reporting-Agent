@@ -22,9 +22,13 @@ CATEGORY = {
     # `multi_turn` CỐ Ý không có ở đây: evaluator gọi thẳng pipeline (stateless), đo
     # hội thoại phải qua `ask_with_context` nên nằm ở tests/test_multi_turn.py.
     "cross_bu", "buyer_vs_owner", "point_in_time", "join_safety",
+    # Golden set Sprint 2 v2: taxonomy benchmark mở rộng. Metadata này được giữ
+    # nguyên cả khi evaluator hiện tại chưa chấm riêng visualization/multi-turn.
+    "insufficient_data", "semantic_clarification", "short_term_state", "visualization",
 }
 STATUS = {"ok", "clarify", "out_of_scope", "error"}
-REFUSAL = {c.value for c in RefusalCode} | {None}
+REFUSAL = {c.value for c in RefusalCode} | {"insufficient_feature", None}
+_PROJECTION_COLUMNS = {"customer_id", "snapshot_date"}
 
 
 def load_golden(path: str | None = None) -> dict:
@@ -43,9 +47,9 @@ def load_golden_cases(path: str | None = None) -> list[dict]:
 
 
 def split_cases(path: str | None = None) -> tuple[list[dict], list[dict]]:
-    """Trả (dev, holdout) theo danh sách code trong golden_set.yaml."""
+    """Trả (dev, holdout) theo `splits.holdout` v2 hoặc `holdout` legacy."""
     data = load_golden(path)
-    holdout_codes = set(data.get("holdout") or [])
+    holdout_codes = set((data.get("splits") or {}).get("holdout") or data.get("holdout") or [])
     dev, hold = [], []
     for c in data.get("cases", []):
         (hold if c.get("code") in holdout_codes else dev).append(c)
@@ -103,7 +107,7 @@ def assert_holdout_unchanged(path: str | None = None) -> str:
 def validate_cases(cases: list[dict]) -> list[str]:
     """Trả về danh sách lỗi (rỗng = hợp lệ). Không raise — caller quyết định."""
     errors: list[str] = []
-    canonical = frozenset(feature_names())
+    canonical = frozenset(feature_names()) | _PROJECTION_COLUMNS
     seen: set[str] = set()
     for c in cases:
         code = c.get("code")

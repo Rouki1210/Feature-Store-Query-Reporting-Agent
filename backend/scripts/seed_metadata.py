@@ -9,9 +9,11 @@ YAML cũ (quên regenerate sau khi sửa describer/spec).
 """
 from __future__ import annotations
 
+import json
 import yaml
 from sqlalchemy import text
 
+from app.agent.breakdown import DEFAULT_BREAKDOWNS
 from app.config import get_settings
 from app.db import get_engine
 from app.semantic.feature_spec import feature_names
@@ -130,10 +132,44 @@ def seed_join_catalog() -> int:
     return len(DEFAULT_RULES)
 
 
+def seed_breakdown_catalog() -> int:
+    """Đồng bộ registry khai báo; không lưu biểu thức SQL tự do."""
+    with get_engine().begin() as conn:
+        conn.execute(text("UPDATE metadata.breakdown_catalog SET is_active = FALSE"))
+        for spec in DEFAULT_BREAKDOWNS:
+            data = spec.as_catalog_dict()
+            conn.execute(text("""
+                INSERT INTO metadata.breakdown_catalog
+                  (dimension_key, label_vi, aliases, strategy, source_tables, members,
+                   compatible_dimensions, overlap_possible, is_active)
+                VALUES (:key, :label, :aliases, :strategy, :tables, CAST(:members AS jsonb),
+                        :compatible, :overlap, TRUE)
+                ON CONFLICT (dimension_key) DO UPDATE SET
+                  label_vi=EXCLUDED.label_vi, aliases=EXCLUDED.aliases,
+                  strategy=EXCLUDED.strategy, source_tables=EXCLUDED.source_tables,
+                  members=EXCLUDED.members,
+                  compatible_dimensions=EXCLUDED.compatible_dimensions,
+                  overlap_possible=EXCLUDED.overlap_possible, is_active=TRUE,
+                  updated_at=CURRENT_TIMESTAMP
+            """), {
+                "key": data["dimension_key"], "label": data["label_vi"],
+                "aliases": data["aliases"], "strategy": data["strategy"],
+                "tables": data["source_tables"],
+                "members": json.dumps(data["members"], ensure_ascii=False),
+                "compatible": data["compatible_dimensions"],
+                "overlap": data["overlap_possible"],
+            })
+    return len(DEFAULT_BREAKDOWNS)
+
+
 def main() -> None:
     features, synonyms = seed()
     joins = seed_join_catalog()
-    print(f"Seeded metadata from YAML: features={features}, synonyms={synonyms}, joins={joins}")
+    breakdowns = seed_breakdown_catalog()
+    print(
+        "Seeded metadata from YAML: "
+        f"features={features}, synonyms={synonyms}, joins={joins}, breakdowns={breakdowns}"
+    )
 
 
 if __name__ == "__main__":

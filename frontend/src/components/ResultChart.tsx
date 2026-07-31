@@ -2,61 +2,95 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import type { QueryResult } from "../types";
+import type { QueryResult, ResultShape } from "../types";
 
-// Bar 1 series (nhãn → số): 1 hue accessible, không legend (title nêu tên),
-// grid ngang mờ, trục recessive, đầu cột bo 4px. Bảng là fallback (toggle ở ResultView).
+// Bar (category) / Line (time_series). Hue accessible, grid ngang mờ, trục recessive.
+// Bảng là fallback (toggle ở Message). Backend quyết định shape — component không đoán.
 const NF = new Intl.NumberFormat("vi-VN");
-const BAR = "#4f46e5"; // primary-container (indigo) — khớp design
-const MAX_BARS = 40;
+const SERIES = ["#4f46e5", "#0891b2", "#c2410c", "#15803d"]; // khớp design, 4 hue phân biệt được
+const MAX_POINTS = 40;
+const AXIS = { fill: "#64748b", fontSize: 11 } as const;
 
-export function ResultChart({ result }: { result: QueryResult }) {
-  const [labelCol, valueCol] = result.columns;
-  const data = result.rows.slice(0, MAX_BARS).map((r) => ({
-    label: String(r[0] ?? "—"),
-    value: r[1] as number,
-  }));
-  const capped = result.rows.length > MAX_BARS;
+export function ResultChart({
+  result,
+  shape,
+}: {
+  result: QueryResult;
+  shape: ResultShape;
+}) {
+  const [labelCol, ...valueCols] = result.columns;
+  const data = result.rows.slice(0, MAX_POINTS).map((row) => {
+    const point: Record<string, unknown> = { label: String(row[0] ?? "—") };
+    valueCols.forEach((name, i) => (point[name] = row[i + 1]));
+    return point;
+  });
+  const capped = result.rows.length > MAX_POINTS;
+  const Chart = shape === "time_series" ? LineChart : BarChart;
 
   return (
     <div>
       <div className="mb-1 text-xs text-slate-500">
-        {valueCol} theo {labelCol}
-        {capped && ` (${MAX_BARS} dòng đầu)`}
+        {valueCols.join(", ")} theo {labelCol}
+        {capped && ` (${MAX_POINTS} dòng đầu)`}
       </div>
       <ResponsiveContainer width="100%" height={320}>
-        <BarChart data={data} margin={{ top: 8, right: 12, bottom: 8, left: 8 }}>
+        <Chart data={data} margin={{ top: 8, right: 12, bottom: 8, left: 8 }}>
           <CartesianGrid vertical={false} stroke="#e2e8f0" />
           <XAxis
             dataKey="label"
-            angle={-40}
-            textAnchor="end"
-            interval={0}
-            height={64}
-            tick={{ fill: "#64748b", fontSize: 11 }}
+            angle={shape === "time_series" ? 0 : -40}
+            textAnchor={shape === "time_series" ? "middle" : "end"}
+            interval={shape === "time_series" ? "preserveStartEnd" : 0}
+            height={shape === "time_series" ? 32 : 64}
+            tick={AXIS}
             tickLine={false}
             axisLine={{ stroke: "#cbd5e1" }}
           />
           <YAxis
             width={64}
-            tick={{ fill: "#64748b", fontSize: 11 }}
+            tick={AXIS}
             tickLine={false}
             axisLine={false}
             tickFormatter={(v) => NF.format(v as number)}
           />
           <Tooltip
-            cursor={{ fill: "#f1f5f9" }}
+            cursor={shape === "time_series" ? { stroke: "#cbd5e1" } : { fill: "#f1f5f9" }}
             formatter={(v) => NF.format(v as number)}
             labelStyle={{ color: "#334155" }}
             contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
           />
-          <Bar dataKey="value" fill={BAR} radius={[4, 4, 0, 0]} maxBarSize={48} />
-        </BarChart>
+          {/* Một series thì tiêu đề trên đã nêu tên — legend chỉ thêm nhiễu. */}
+          {valueCols.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} />}
+          {valueCols.map((name, i) =>
+            shape === "time_series" ? (
+              <Line
+                key={name}
+                type="monotone"
+                dataKey={name}
+                stroke={SERIES[i % SERIES.length]}
+                strokeWidth={2}
+                dot={data.length <= 12}
+                connectNulls
+              />
+            ) : (
+              <Bar
+                key={name}
+                dataKey={name}
+                fill={SERIES[i % SERIES.length]}
+                radius={[4, 4, 0, 0]}
+                maxBarSize={48}
+              />
+            ),
+          )}
+        </Chart>
       </ResponsiveContainer>
     </div>
   );

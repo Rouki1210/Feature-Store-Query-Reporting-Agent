@@ -40,12 +40,30 @@ _WINDOW_QUESTION = (
 )
 
 
+def _has_window(q: str) -> bool:
+    """Dùng CHUNG bộ nhận mốc thời gian với retriever — hai từ vựng riêng là bug im lặng.
+
+    Router từng coi mỗi chữ "ngày"/"tháng" là đã có cửa sổ nên không hỏi lại, trong
+    khi retriever không hiểu "30 ngày gần nhất" và mặc định lấy cột `_all`: user hỏi
+    30 ngày, agent trả luỹ kế từ trước đến nay mà không báo gì.
+    """
+    from app.semantic.retriever import _strip_accents, has_time_reference
+
+    return has_time_reference(_strip_accents(q))
+
+
 class RuleRouter:
-    _recent_window = ("gần đây", "gan day", "recent", "recently")
     _trend = ("thay đổi", "thay doi", "xu hướng", "xu huong", "trend")
     _loyalty = ("loyalty", "vinclub")
-    _window = ("daily", "l1w", "l2w", "l1m", "l2m", "l3m", "l6m", "l12m", "hôm nay", "ngày", "tuần", "tháng", "month", "week")
-    _windowed_metric = ("số chuyến", "số đơn", "hoàn thành", "completed", "bị hủy", "canceled", "chi tiêu", "giá trị", "quãng đường", "hoạt động")
+    # Metric phụ thuộc cửa sổ ⇒ thiếu window thì PHẢI hỏi lại, không tự chọn.
+    # Phải phủ cả cách nói không dùng danh từ "chi tiêu": "chi bao nhiêu", "tiêu bao
+    # nhiêu", "trả bao nhiêu" — trước đây lọt lưới nên agent tự lấy l12m và im lặng.
+    _windowed_metric = (
+        "số chuyến", "số đơn", "hoàn thành", "completed", "bị hủy", "canceled",
+        "chi tiêu", "giá trị", "quãng đường", "hoạt động",
+        "chi bao nhiêu", "chi bao nhiều", "tiêu bao nhiêu", "trả bao nhiêu",
+        "spend", "doanh thu", "revenue",
+    )
     _cross = ("cross pnl", "liên pnl", "chéo ngành", "chuyển dịch giữa", "earn", "burn", "loyalty", "vinclub")
     _owner = (
         "owner", "ownership", "sở hữu xe", "đứng tên xe", "chủ xe",
@@ -54,8 +72,6 @@ class RuleRouter:
     _cross_bu = (
         "cả hai", "ca hai", "đồng thời", "dong thoi", "overlap", "khách chung",
         "khach chung", "vừa đi gsm vừa mua vinfast", "vua di gsm vua mua vinfast",
-        "theo từng business unit", "từng business unit", "mỗi business unit",
-        "by business unit", "each business unit",
     )
     # 'raw' word-boundary phủ cả raw. / raw data / raw table.
     _raw_pii = ("raw", "pii", "số điện thoại", "phone", "email", "cccd", "địa chỉ", "họ tên", "customer name")
@@ -64,7 +80,14 @@ class RuleRouter:
     _join_request = ("ghép", "ghep", "join")
     _unsafe_join = ("mọi snapshot", "moi snapshot", "bảng khách hàng", "bang khach hang", "ba bảng", "3 bảng")
     _ambiguous_order = ("đặt xe", "dat xe")
-    _unfinished_order = ("chưa hoàn tất", "chua hoan tat")
+    # "Chưa hoàn thành" KHÔNG có cột nào tương ứng: feature store chỉ có completed,
+    # canceled, delivered, scheduled — không có pending/in-progress. Đơn chưa hoàn thành
+    # có thể là đã hủy, hoặc đang xử lý, hoặc đã đặt mà chưa bàn giao: ba con số khác
+    # nhau. Phải hỏi lại (CLAUDE.md mục 5), không được đoán.
+    _unfinished_order = (
+        "chưa hoàn tất", "chua hoan tat", "chưa hoàn thành", "chua hoan thanh",
+        "không hoàn thành", "khong hoan thanh", "chưa xong", "chua xong",
+    )
     _review = ("nvso", "work order", "work_order", "wo")
     # Agent read-only: yêu cầu ghi/xóa/DDL, hoặc "trả toàn bộ cột" (SELECT *) → ngoài phạm vi.
     _unsafe = ("xóa", "xoá", "delete", "drop", "truncate", "insert")
@@ -86,7 +109,10 @@ class RuleRouter:
         "khách hàng", "customer", "dữ liệu", "data",
     )
 
-    def route(self, question: str, max_chars: int = 2000) -> tuple[str, RouteDecision]:
+    def route(
+        self, question: str, max_chars: int = 2000,
+        *, breakdown_dimension: str | None = None,
+    ) -> tuple[str, RouteDecision]:
         original, q = normalize_question(question, max_chars)
         if _hit(q, self._loyalty):
             return original, RouteDecision(
@@ -118,12 +144,41 @@ class RuleRouter:
                 reason="Yêu cầu này không thuộc feature snapshot hoặc vượt chính sách join an toàn.",
                 refusal_code=RefusalCode.irrelevant,
             )
-        if _hit(q, self._ambiguous_order) and _hit(q, self._unfinished_order):
-            return original, RouteDecision(
-                intent=IntentType.clarify, confidence=0.9,
-                reason="Trạng thái đơn xe chưa có định nghĩa feature rõ ràng.",
-                clarifying_question="Bạn muốn xem đơn chưa hoàn tất theo trạng thái nghiệp vụ nào?",
-            )
+        gsm = bool(re.search(r"\b(gsm|xanh sm|taxi|gọi xe|chuyến)\b", q))
+        vf = bool(re.search(r"\b(vinfast|vf|xe điện|phụ kiện|đơn xe)\b", q) or _hit(q, self._owner))
+        cross_bu = (
+            (gsm and vf) or _hit(q, self._cross_bu) or (gsm and _hit(q, self._owner))
+            or breakdown_dimension == "business_unit"
+        )
+        bu = "GSM" if gsm else ("VINFAST" if vf else None)
+        # Không còn đòi kèm "đặt xe": "Số đơn VinFast chưa hoàn thành trong 1 tháng" trước
+        # đây lọt xuống retrieval và trả `txn_completed_count_l1m` — đúng cái ngược lại.
+        if _hit(q, self._unfinished_order):
+            if cross_bu:
+                return original, RouteDecision(
+                    intent=IntentType.out_of_scope, confidence=0.95,
+                    reason=(
+                        "Chưa hỗ trợ thống kê giao dịch 'chưa hoàn thành' xuyên GSM và VinFast. "
+                        "Hãy hỏi riêng một business unit."
+                    ),
+                    refusal_code=RefusalCode.irrelevant,
+                )
+            if bu:
+                label = "GSM" if bu == "GSM" else "VinFast"
+                return original, RouteDecision(
+                    intent=IntentType.clarify, business_unit=bu, confidence=0.9,
+                    reason=(
+                        f"Feature store không có trạng thái pending/processing nên không thể tính tổng "
+                        f"giao dịch 'chưa hoàn thành' của {label}."
+                    ),
+                    clarifying_question=(
+                        f"{label} chỉ hỗ trợ thống kê giao dịch đã hủy trong cửa sổ thời gian này. "
+                        "Bạn có muốn xem số giao dịch đã hủy không?"
+                    ),
+                    known_slots={"business_unit": bu}, missing_slots=["order_status"],
+                )
+            # Thiếu BU: nhường cho flow chuẩn bên dưới hỏi GSM/VinFast trước.
+            # Không đưa option trạng thái chung vì mỗi BU có feature khác nhau.
         if _hit(q, self._review):
             return original, RouteDecision(
                 intent=IntentType.clarify, confidence=0.9,
@@ -137,11 +192,8 @@ class RuleRouter:
                 reason="Agent chỉ đọc (read-only): không ghi/xóa dữ liệu và không trả toàn bộ cột (SELECT *).",
             )
 
-        gsm = bool(re.search(r"\b(gsm|xanh sm|taxi|gọi xe|chuyến)\b", q))
-        vf = bool(re.search(r"\b(vinfast|vf|xe điện|phụ kiện|đơn xe)\b", q) or _hit(q, self._owner))
-        cross_bu = (gsm and vf) or _hit(q, self._cross_bu) or (gsm and _hit(q, self._owner))
         if cross_bu:
-            if _hit(q, self._windowed_metric) and not (_hit(q, self._window) or _hit(q, self._recent_window)):
+            if _hit(q, self._windowed_metric) and not _has_window(q):
                 return original, RouteDecision(
                     intent=IntentType.clarify, business_unit="CROSS_BU", confidence=0.7,
                     reason="Thiếu time window cho metric xuyên đơn vị.",
@@ -152,7 +204,6 @@ class RuleRouter:
                 intent=IntentType.cross_bu, business_unit="CROSS_BU", confidence=0.85,
                 known_slots={"business_unit": "CROSS_BU"},
             )
-        bu = "GSM" if gsm else ("VINFAST" if vf else None)
         # Lọc câu lạc đề: không BU và không tín hiệu domain → ngoài phạm vi
         # (thay vì hỏi 'GSM hay VinFast?' cho câu chẳng liên quan gì).
         if bu is None and not _hit(q, self._domain):
@@ -161,7 +212,7 @@ class RuleRouter:
                 reason="Câu hỏi ngoài phạm vi dữ liệu feature store Sprint 2 (chỉ GSM/VinFast).",
                 refusal_code=RefusalCode.irrelevant,
             )
-        if bu and _hit(q, self._windowed_metric) and not (_hit(q, self._window) or _hit(q, self._recent_window)):
+        if bu and _hit(q, self._windowed_metric) and not _has_window(q):
             return original, RouteDecision(
                 intent=IntentType.clarify, confidence=0.7,
                 reason="Thiếu time window cho metric dùng feature snapshot.",

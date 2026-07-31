@@ -46,6 +46,14 @@ class CoverageInfo(BaseModel):
 
     non_null_ratio: float | None = None
     note: str | None = None
+    # Backend quyết định "thấp" theo `coverage_low_ratio`; UI chỉ đổi màu theo cờ này
+    # thay vì tự giữ một ngưỡng riêng.
+    is_low: bool = False
+
+
+class ClarificationOption(BaseModel):
+    value: str
+    label: str
 
 
 class AskResponse(BaseModel):
@@ -57,6 +65,13 @@ class AskResponse(BaseModel):
     answer_vi: str = Field(default="", description="Diễn giải ngắn bằng tiếng Việt")
     sql: str | None = Field(default=None, description="SQL đã sinh — luôn hiển thị để kiểm chứng")
     result: QueryResult | None = None
+    result_shape: str = Field(
+        default="table", description="scalar | time_series | category | table — backend quyết định"
+    )
+    assumptions: list[str] = Field(
+        default_factory=list,
+        description="Giới hạn dữ liệu/giả định do generator ghi lại; hiển thị tách khỏi confidence.",
+    )
     retrieved: list[RetrievedFeature] = Field(default_factory=list)
     confidence: Confidence = Confidence.medium
     coverage: CoverageInfo | None = None
@@ -65,6 +80,7 @@ class AskResponse(BaseModel):
     join_explanation: str | None = None
     known_slots: dict[str, str | int] = Field(default_factory=dict)
     missing_slots: list[str] = Field(default_factory=list)
+    clarification_options: list[ClarificationOption] = Field(default_factory=list)
     refusal_code: str | None = Field(
         default=None, description="Mã từ chối khi out_of_scope/clarify (cho eval guardrail)."
     )

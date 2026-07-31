@@ -12,7 +12,11 @@ from sqlalchemy import text
 
 from app.db import get_engine
 from app.semantic.feature_spec import ALL_TIME, SPRINT2_WINDOWS, WINDOW_DAYS, all_features
-from scripts.seed_metadata import seed as seed_metadata, seed_join_catalog
+from scripts.seed_metadata import (
+    seed as seed_metadata,
+    seed_breakdown_catalog,
+    seed_join_catalog,
+)
 
 RNG = random.Random(20260723)
 _snapshot_text = os.getenv("SNAPSHOT_DATE")
@@ -661,12 +665,14 @@ def seed() -> dict[str, int]:
         _insert(conn, "feature.customer_cross_bu_feature", cross)
     feature_count, synonym_count = seed_metadata()
     join_rules = seed_join_catalog()
+    breakdowns = seed_breakdown_catalog()
     return {
         "customers": len(customers), "snapshots": len(SNAPSHOTS), "dates": len(dates),
         "trips": len(trips), "orders": len(orders),
         "status_history": len(history), "handovers": len(handovers),
         "gsm_rows": len(gsm), "vinfast_rows": len(vf), "cross_bu_rows": len(cross),
-        "catalog": feature_count, "synonyms": synonym_count, "join_rules": join_rules,
+        "catalog": feature_count, "synonyms": synonym_count,
+        "join_rules": join_rules, "breakdowns": breakdowns,
     }
 
 

@@ -1,6 +1,1 @@
-2  locked=2026-07-28  reason=sprint2-scope-change
-# v1 (2026-07-27, 20 case) khoa cho Sprint 1.
-# v2: +9 case Sprint 2 vao holdout; G02/G08/G13 doi ky vong vi SCOPE doi
-#     (owner + cross-BU duoc mo o Sprint 2), KHONG phai tuning theo ket qua.
-# Case an toan (S05, S20-S23) co y de o DEV: safety khong tune duoc nen giau
-#     vao holdout khong co loi ich gi.
+3  locked=2026-07-30

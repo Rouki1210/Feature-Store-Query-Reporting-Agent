@@ -26,7 +26,11 @@ export interface RetrievedFeature {
 export interface CoverageInfo {
   non_null_ratio: number | null; // 0..1
   note: string | null;
+  is_low: boolean; // backend quyết định theo COVERAGE_LOW_RATIO — đừng giữ ngưỡng riêng ở đây
 }
+
+/** Backend quyết định cách hiển thị; frontend không tự đoán từ shape của result. */
+export type ResultShape = "scalar" | "time_series" | "category" | "table";
 
 export interface TraceItem {
   stage: string;
@@ -42,6 +46,8 @@ export interface AskResponse {
   answer_vi: string;
   sql: string | null;
   result: QueryResult | null;
+  result_shape: ResultShape;
+  assumptions: string[];
   retrieved: RetrievedFeature[];
   confidence: Confidence;
   coverage: CoverageInfo | null;
@@ -49,7 +55,8 @@ export interface AskResponse {
   join_explanation: string | null;
   refusal_code: string | null;
   known_slots: Record<string, string | number>;
-  missing_slots: string[]; // "business_unit" | "window" | "top_n"
+  missing_slots: string[];
+  clarification_options: { value: string; label: string }[];
   clarifying_question: string | null;
   error: string | null;
   pipeline_trace: TraceItem[];

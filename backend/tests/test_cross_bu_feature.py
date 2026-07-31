@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
+import pytest
+
 from scripts.generate_mock_data import build_cross_bu, cross_bu_errors
 
 UTC = timezone.utc
@@ -262,6 +264,33 @@ def test_narrowing_penalty_lifts_only_when_the_question_asks_for_it():
     vehicles = [f.name for f in layer.retrieve(
         "Bao nhiêu khách đã mua xe VinFast", business_unit="VINFAST", top_k=3)]
     assert any("vehicle" in name for name in vehicles)
+
+
+@pytest.mark.parametrize(("question", "business_unit", "expected"), [
+    ("Khách nào đã nhận bàn giao xe VinFast", "VINFAST", {"is_vehicle_owner"}),
+    (
+        "So sánh số khách có đơn xe hoàn tất với số khách đã nhận xe",
+        "VINFAST",
+        {"is_vehicle_buyer", "is_vehicle_owner"},
+    ),
+    (
+        "Chi tiêu VinFast trung bình của khách hoạt động GSM trong 1 tháng gần nhất",
+        "CROSS_BU",
+        {"vinfast_spend_l1m", "is_active_gsm_l1m"},
+    ),
+])
+def test_sprint2_golden_retrieval_keeps_required_population_features(
+    question, business_unit, expected
+):
+    from app.semantic.retriever import SemanticLayer
+
+    names = {
+        feature.name
+        for feature in SemanticLayer.load("data/semantic_layer.yaml").retrieve(
+            question, business_unit=business_unit, top_k=5
+        )
+    }
+    assert expected <= names
 
 
 def test_money_question_does_not_return_boolean_flags():

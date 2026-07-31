@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.agent.contracts import GenerationRequest, RouteDecision
+from app.agent.contracts import BreakdownPlan, GenerationRequest, RouteDecision
 from app.semantic.retriever import ScoredFeature
 
 
@@ -52,7 +52,10 @@ def context_features(
         or (f.table or "").lower() in plan_tables
         or (f.business_unit or "").upper() == route.business_unit.upper()
     ]
-    return _with_state_flags(allowed)
+    # Runtime joins need only the explicitly retrieved columns from each side.
+    # Adding every boolean flag here makes the context noisy and breaks the
+    # selected-feature contract; single-table queries still get the state helpers.
+    return allowed if len(plan_tables) > 1 else _with_state_flags(allowed)
 
 
 def build_feature_context(
@@ -96,9 +99,11 @@ def build_feature_context(
 
 
 def generation_request(
-    question: str, route: RouteDecision, features: list[ScoredFeature], join_plan: dict | None = None,
+    question: str, route: RouteDecision, features: list[ScoredFeature],
+    join_plan: dict | None = None, breakdown_plan: BreakdownPlan | None = None,
 ) -> GenerationRequest:
     return GenerationRequest(
         question=question, route=route,
-        feature_context=build_feature_context(route, features, join_plan), join_plan=join_plan,
+        feature_context=build_feature_context(route, features, join_plan),
+        join_plan=join_plan, breakdown_plan=breakdown_plan,
     )

@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     # Giới hạn cấu trúc SQL; catalog vẫn là chốt chặn từng cặp/key join.
     sql_max_joins: int = Field(default=2, ge=0, alias="SQL_MAX_JOINS")
     sql_max_ctes: int = Field(default=2, ge=0, alias="SQL_MAX_CTES")
+    # Breakdown sinh mỗi nhóm một nhánh UNION ALL, mỗi nhánh là một lần quét bảng.
+    # 40 = trần số nhóm của BreakdownPlanner; guard chặn ở cùng con số để LLM không
+    # tự viết truy vấn rộng hơn thứ planner cho phép.
+    sql_max_union_branches: int = Field(default=40, ge=1, alias="SQL_MAX_UNION_BRANCHES")
+    breakdown_max_groups: int = Field(default=40, ge=1, alias="BREAKDOWN_MAX_GROUPS")
     sql_sensitive_columns: str = Field(
         default="customer_name,phone,phone_number,email,national_id,cccd,address,dob,full_name",
         alias="SQL_SENSITIVE_COLUMNS",
@@ -52,6 +57,12 @@ class Settings(BaseSettings):
     # mơ hồ ⇒ hỏi lại (mục 5), không sinh SQL "gọi tất cả". Calib: câu cụ thể ≥2.75,
     # mơ hồ ≤1.5.
     retrieval_min_score: float = Field(default=2.0, alias="RETRIEVAL_MIN_SCORE")
+
+    # ---- Coverage ----
+    # NGƯỠNG DUY NHẤT cho "độ phủ thấp" (CLAUDE.md mục 5). Trước đây narrator dùng
+    # 0.3 còn frontend dùng 0.5: ba chỗ cảnh báo cùng một chuyện ở hai ngưỡng khác
+    # nhau thì user ngừng đọc cảnh báo. Backend quyết định, UI chỉ hiển thị.
+    coverage_low_ratio: float = Field(default=0.3, ge=0.0, le=1.0, alias="COVERAGE_LOW_RATIO")
 
     # ---- Conversation (multi-turn clarify) ----
     # TTL của pending question (short-term state). Hết hạn ⇒ coi câu trả lời ngắn

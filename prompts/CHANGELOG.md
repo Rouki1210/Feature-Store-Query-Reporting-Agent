@@ -20,6 +20,7 @@ Chạy: `python -m scripts.run_eval --tag <version> --split dev`
 | `sprint2-v5` | 2026-07-29 | V4 baseline restored; Cross-BU activity/spend gets scoped scoring only, without hard retrieval reordering. | **84%** | tag `sprint2-prompt-v5`, model `deepseek-v4-flash` |
 | `sprint2-v6` | 2026-07-29 | Cấm COALESCE→0 bóp méo mẫu số; siết population filter phải dùng cờ. Kèm các sửa retrieval/context bên dưới. | **84%** | **Baseline chốt** — tag `sprint2-prompt-v6`, model `deepseek-v4-flash` |
 | `sprint2-v7` | 2026-07-29 | Tách revenue/customer count theo từng BU thành hai dòng GSM/VINFAST; đồng bộ state flags giữa context và validator allowlist. | chưa chạy | pending eval, model `deepseek-v4-flash` |
+| `sprint2-v8` | 2026-07-29 | Thay rule breakdown BU hardcode bằng BreakdownPlan từ semantic metadata; pivot/boolean được compile deterministic, physical dimension vẫn qua LLM + guard. | chưa chạy | pending eval, model `deepseek-v4-flash` |
 
 > **Luật mới:** cột "Ghi chú" phải ghi **model**. `sprint2-v5` chạy trên `deepseek-v4-flash`
 > trong khi các version trước chạy model khác — latency p95 giảm 21.4s→12.5s và exec_acc

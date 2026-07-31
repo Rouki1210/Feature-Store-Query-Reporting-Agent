@@ -16,6 +16,7 @@ import yaml
 # Cho phép chạy trực tiếp bằng `python -m scripts.generate_semantic_layer`.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from app.agent.breakdown import DEFAULT_BREAKDOWNS
 from app.config import get_settings
 from app.semantic.feature_describer import describe
 from app.semantic.feature_spec import GROUPS, TABLES, all_features
@@ -57,6 +58,7 @@ def build() -> dict:
         "meta": {
             "tables": TABLES,
             "groups": GROUPS,
+            "breakdowns": [spec.as_catalog_dict() for spec in DEFAULT_BREAKDOWNS],
             "feature_count": len(features),
             "note": "Sinh tự động — KHÔNG sửa tay. Nguồn: app/semantic/feature_spec.py + feature_describer.py",
         },

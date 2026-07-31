@@ -4,7 +4,6 @@ import { ResultView } from "./ResultView";
 import { SqlPanel } from "./SqlPanel";
 import { TechnicalDetails } from "./TechnicalDetails";
 import { Icon } from "./Icon";
-import { chartable, scalar } from "../lib/table";
 import { downloadCsv } from "../lib/csv";
 
 const CONF: Record<Confidence, { label: string; cls: string; icon: string }> = {
@@ -19,21 +18,9 @@ const STATUS_CHIP: Partial<Record<AskStatus, { label: string; cls: string; icon:
   error: { label: "Lỗi", cls: "text-error", icon: "error" },
 };
 
-// Chip phải là thứ backend PARSE ĐƯỢC: xem `_WINDOW_PHRASES` và `_answer_slots`
-// trong backend/app/agent/conversation.py. Đề nghị một lựa chọn rồi từ chối chính
-// câu trả lời đó là cách nhanh nhất để user bỏ cuộc.
-const SLOT_CHOICES: Record<string, string[]> = {
-  business_unit: ["GSM", "VinFast", "Cả hai"],
-  window: ["1 tháng", "3 tháng", "6 tháng", "12 tháng", "Tổng cộng"],
-  top_n: ["Top 10", "Top 20"],
-};
-
-/** Chip gợi ý theo đúng slot còn thiếu; không biết thiếu gì thì hỏi Business Unit. */
-function quickReplies(missing: string[]): string[] {
-  const known = missing.filter((s) => s in SLOT_CHOICES);
-  const slots = known.length ? known : ["business_unit"];
-  return [...slots.flatMap((s) => SLOT_CHOICES[s]), "Hủy"];
-}
+// Chip do BACKEND quyết định (`clarification_options`) — nó biết slot nào đang
+// thiếu và parse được giá trị nào. Danh sách hard-code phía client từng mời sai
+// slot ("Business unit" khi backend chờ `breakdown_dimension`) nên đã bỏ.
 
 export function Message({
   response: r,
@@ -42,11 +29,12 @@ export function Message({
   response: AskResponse;
   onQuickReply: (t: string) => void;
 }) {
+  // Mặc định luôn mở bảng (scalar không có bảng — ResultView tự trả KPI card).
   const [view, setView] = useState<"table" | "chart">("table");
   const conf = CONF[r.confidence];
   const chip = STATUS_CHIP[r.status];
   const pct = r.coverage?.non_null_ratio == null ? null : Math.round(r.coverage.non_null_ratio * 1000) / 10;
-  const canToggle = r.result != null && scalar(r.result) == null && chartable(r.result);
+  const canToggle = r.result_shape === "category" || r.result_shape === "time_series";
   const hasRows = !!r.result && r.result.rows.length > 0;
 
   return (
@@ -78,19 +66,29 @@ export function Message({
 
         {r.answer_vi && <p className="leading-relaxed text-on-surface">{r.answer_vi}</p>}
 
+        {r.status === "ok" && r.join_explanation && (
+          <div className="flex gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm text-on-surface-variant">
+            <Icon name="account_tree" className="mt-0.5 shrink-0 text-[16px] text-primary" />
+            <div>
+              <p className="font-medium text-on-surface">Nguồn dữ liệu</p>
+              <p>{r.join_explanation}</p>
+            </div>
+          </div>
+        )}
+
         {r.status === "clarify" && r.clarifying_question && (
           <div className="space-y-2">
             <div className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-on-surface">
               {r.clarifying_question}
             </div>
             <div className="flex flex-wrap gap-2">
-              {quickReplies(r.missing_slots ?? []).map((q) => (
+              {[...(r.clarification_options ?? []), { value: "Hủy", label: "Hủy" }].map((q) => (
                 <button
-                  key={q}
-                  onClick={() => onQuickReply(q)}
+                  key={q.value}
+                  onClick={() => onQuickReply(q.value)}
                   className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-on-surface-variant transition-colors hover:border-primary hover:text-primary"
                 >
-                  {q}
+                  {q.label}
                 </button>
               ))}
             </div>
@@ -103,7 +101,7 @@ export function Message({
           </div>
         )}
 
-        {r.result && <ResultView result={r.result} view={view} />}
+        {r.result && <ResultView result={r.result} shape={r.result_shape} view={view} />}
         {r.sql && <SqlPanel sql={r.sql} />}
 
         {(canToggle || hasRows) && (
@@ -131,11 +129,12 @@ export function Message({
         {/* Meta: coverage + repairs (gắn cờ độ phủ theo mục 5) */}
         {r.status === "ok" && (pct != null || r.repairs > 0 || r.coverage?.note) && (
           <div className="flex flex-wrap items-center gap-2 text-[11px] text-text-secondary">
+            {/* Ngưỡng "thấp" do backend quyết (COVERAGE_LOW_RATIO) — không giữ số ở đây. */}
             {pct != null && (
               <span
-                className={`rounded-full px-2 py-0.5 ${pct < 50 ? "bg-warning/10 text-warning" : "bg-surface-muted"}`}
+                className={`rounded-full px-2 py-0.5 ${r.coverage?.is_low ? "bg-warning/10 text-warning" : "bg-surface-muted"}`}
               >
-                {pct < 50 && "⚠ "}Độ phủ: {pct}%
+                {r.coverage?.is_low && "⚠ "}Độ phủ: {pct}%
               </span>
             )}
             {r.repairs > 0 && (
@@ -147,6 +146,22 @@ export function Message({
         {r.status === "ok" && r.confidence === "low" && (
           <div className="text-xs text-error">
             ⚠ Độ tin cậy thấp — hãy kiểm chứng SQL trước khi dùng.
+          </div>
+        )}
+        {/* Giả định/giới hạn dữ liệu: tách khỏi confidence và coverage vì nó nói về
+            PHẠM VI câu trả lời, không phải độ tin cậy của SQL. */}
+        {r.status === "ok" && r.assumptions?.length > 0 && (
+          <div className="rounded-lg border border-border bg-surface-muted px-3 py-2 text-xs text-on-surface-variant">
+            <span className="font-medium">Giả định khi trả lời: </span>
+            {r.assumptions.length === 1 ? (
+              r.assumptions[0]
+            ) : (
+              <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                {r.assumptions.map((a) => (
+                  <li key={a}>{a}</li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 

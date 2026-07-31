@@ -21,10 +21,16 @@ GSM_PAYLOAD = {
     # ORDER BY customer_id là bắt buộc với list per-customer (validator.py:74) — stub phải
     # sinh SQL hợp lệ, nếu không test state lại đỏ vì lý do chẳng liên quan tới state.
     "sql": (
-        "SELECT customer_id, completed_original_price_sum_l1m "
+        "SELECT customer_id, completed_txn_count_l1m "
         "FROM feature.gsm_transaction ORDER BY customer_id"
     ),
-    "selected_features": ["completed_original_price_sum_l1m"],
+    "selected_features": ["completed_txn_count_l1m"],
+    "intent": "single_bu",
+    "confidence": 0.95,
+}
+CANCELED_GSM_PAYLOAD = {
+    "sql": "SELECT SUM(canceled_txn_count_l1m) AS canceled_count FROM feature.gsm_transaction",
+    "selected_features": ["canceled_txn_count_l1m"],
     "intent": "single_bu",
     "confidence": 0.95,
 }
@@ -98,3 +104,21 @@ def test_invalid_short_reply_keeps_pending_slots():
     r = ask_with_context(p, "S1", "chủ xe VinFast")
     assert r.status == "clarify"
     assert "S1" in _STORE
+
+
+def test_unfinished_gsm_only_offers_and_resolves_canceled_status():
+    p = _pipe(CANCELED_GSM_PAYLOAD)
+    first = ask_with_context(p, "S1", "Số giao dịch GSM không hoàn thành trong 1 tháng")
+    assert first.status == "clarify"
+    assert [option.model_dump() for option in first.clarification_options] == [
+        {"value": "Đã hủy", "label": "Đã hủy"}
+    ]
+
+    invalid = ask_with_context(p, "S1", "Đã bàn giao")
+    assert invalid.status == "clarify"
+    assert invalid.clarification_options == first.clarification_options
+    assert "S1" in _STORE
+
+    resolved = ask_with_context(p, "S1", "Đã hủy")
+    assert resolved.status == "ok"
+    assert "canceled_txn_count_l1m" in (resolved.sql or "")

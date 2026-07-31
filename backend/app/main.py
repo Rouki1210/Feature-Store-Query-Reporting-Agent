@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.agent.conversation import ask_with_context
+from app.agent.breakdown import BreakdownPlanner
 from app.agent.generator import SQLGenerator
 from app.agent.llm_client import OpenAIJSONClient
 from app.agent.pipeline import AgentPipeline
@@ -34,7 +35,16 @@ app.add_middleware(
 @lru_cache
 def _pipeline() -> AgentPipeline:
     # Build một lần; __init__ đọc semantic layer từ DB (đã cache riêng).
-    return AgentPipeline(SQLGenerator(OpenAIJSONClient(get_settings())))
+    try:
+        breakdown_planner = BreakdownPlanner.load_from_db()
+    except Exception:
+        # Migration 0013 có thể chưa được apply ở môi trường vừa deploy; registry
+        # canonical vẫn cho agent chạy, còn DB trở lại nguồn runtime sau migration.
+        breakdown_planner = BreakdownPlanner()
+    return AgentPipeline(
+        SQLGenerator(OpenAIJSONClient(get_settings())),
+        breakdown_planner=breakdown_planner,
+    )
 
 
 @app.get("/health", response_model=HealthResponse)

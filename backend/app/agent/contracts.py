@@ -38,11 +38,26 @@ class RouteDecision(BaseModel):
     missing_slots: list[str] = Field(default_factory=list)
 
 
+class BreakdownPlan(BaseModel):
+    """Kế hoạch phân nhóm đã resolve từ semantic metadata, không chứa SQL tự do."""
+
+    dimensions: list[str] = Field(default_factory=list, max_length=2)
+    members: dict[str, list[str]] = Field(default_factory=dict)
+    metrics: list[dict[str, Any]] = Field(default_factory=list)
+    window: str | None = None
+    strategy: str
+    group_semantics: str = "not_applicable"
+    expected_columns: list[str] = Field(default_factory=list)
+    estimated_groups: int = Field(ge=1, le=40)
+    branches: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class GenerationRequest(BaseModel):
     question: str
     route: RouteDecision
     feature_context: str
     join_plan: dict[str, Any] | None = None
+    breakdown_plan: BreakdownPlan | None = None
 
 
 class GenerationResponse(BaseModel):
@@ -78,6 +93,7 @@ class PipelineContext(BaseModel):
     generation: GenerationResponse | None = None
     validation: ValidationResult | None = None
     repairs: int = 0
+    breakdown_plan: BreakdownPlan | None = None
 
 
 class RepairRequest(BaseModel):
@@ -86,6 +102,7 @@ class RepairRequest(BaseModel):
     error: str
     feature_context: str
     join_plan: dict[str, Any] | None = None
+    breakdown_plan: BreakdownPlan | None = None
 
 
 class NarrationInput(BaseModel):

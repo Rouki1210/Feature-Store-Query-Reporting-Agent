@@ -23,14 +23,26 @@ _FEATURE_TABLES = frozenset({
 })
 
 
-def _resolve_settings(settings: Any) -> tuple[list[str], int, int, int, int]:
+def _resolve_settings(settings: Any) -> tuple[list[str], int, int, int, int, int]:
     if settings is None:
         from app.config import get_settings
         settings = get_settings()
     return (
         settings.sensitive_columns, settings.sql_default_rows, settings.sql_max_rows,
-        settings.sql_max_joins, settings.sql_max_ctes,
+        settings.sql_max_joins, settings.sql_max_ctes, settings.sql_max_union_branches,
     )
+
+
+def _check_union_width(statement: exp.Expression, max_branches: int) -> None:
+    """Mỗi nhánh UNION là một lần quét bảng.
+
+    Breakdown sinh một nhánh cho mỗi nhóm, nên số nhánh là chi phí thật của truy vấn —
+    `sql_max_joins`/`sql_max_ctes` không đếm nó. Không chặn ở đây thì một plan hỏng
+    (hoặc LLM tự viết) có thể quét bảng hàng chục lần mà guard vẫn cho qua.
+    """
+    branches = sum(1 for _ in statement.find_all(exp.SetOperation)) + 1
+    if branches > max_branches:
+        raise GuardError(f"Exceeded SQL_MAX_UNION_BRANCHES={max_branches} (got {branches}).")
 
 
 def _parse(sql: str) -> exp.Expression:
@@ -206,7 +218,8 @@ def validate_sql(
     join_rules: Iterable[Any] = (),
 ) -> str:
     """Return safe SQL or raise GuardError before the query reaches PostgreSQL."""
-    sensitive, default_rows, max_rows, max_joins, max_ctes = _resolve_settings(settings)
+    (sensitive, default_rows, max_rows, max_joins, max_ctes,
+     max_union_branches) = _resolve_settings(settings)
     if not sql or not sql.strip():
         raise GuardError("SQL is empty.")
     statement = _parse(sql)
@@ -214,6 +227,7 @@ def validate_sql(
     _check_star(statement)
     _check_sensitive_columns(statement, sensitive)
     _check_table_allowlist(statement)
+    _check_union_width(statement, max_union_branches)
     _check_join_policy(statement, max_joins, max_ctes, join_plan, join_rules)
     return _enforce_row_limit(statement, default_rows, max_rows)
 

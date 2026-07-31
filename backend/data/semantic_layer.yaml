@@ -19,6 +19,161 @@ meta:
   - Tỷ lệ & xu hướng
   - Sản phẩm & dịch vụ
   - Hoạt động & tần suất
+  breakdowns:
+  - dimension_key: business_unit
+    label_vi: Business unit
+    aliases:
+    - theo từng business unit
+    - từng business unit
+    - mỗi business unit
+    - theo business unit
+    - by business unit
+    - each business unit
+    - business unit
+    - bu breakdown
+    - theo bu
+    strategy: pivot_feature
+    source_tables:
+    - feature.customer_cross_bu_feature
+    members:
+    - key: GSM
+      label: GSM
+      spend: gsm_spend_{window}
+      population_flag: is_active_gsm_{window}
+    - key: VINFAST
+      label: VINFAST
+      spend: vinfast_spend_{window}
+      population_flag: is_active_vinfast_{window}
+    compatible_dimensions:
+    - window
+    overlap_possible: false
+    is_active: true
+  - dimension_key: service_type
+    label_vi: Loại dịch vụ/sản phẩm
+    aliases:
+    - theo dịch vụ
+    - từng dịch vụ
+    - mỗi dịch vụ
+    - loại dịch vụ
+    - service breakdown
+    - by service
+    - theo sản phẩm
+    - loại sản phẩm
+    strategy: pivot_feature
+    source_tables:
+    - feature.gsm_transaction
+    - feature.vinfast_transaction
+    members:
+    - key: taxi
+      label: Taxi
+      business_unit: GSM
+      table: feature.gsm_transaction
+      count: finished_type_taxi_txn_count_{window}
+    - key: bike
+      label: Bike
+      business_unit: GSM
+      table: feature.gsm_transaction
+      count: finished_type_bike_txn_count_{window}
+    - key: express
+      label: Express
+      business_unit: GSM
+      table: feature.gsm_transaction
+      count: finished_type_express_txn_count_{window}
+    - key: food
+      label: Food
+      business_unit: GSM
+      table: feature.gsm_transaction
+      count: finished_type_food_txn_count_{window}
+    - key: accessories
+      label: Accessories
+      business_unit: VINFAST
+      table: feature.vinfast_transaction
+      count: txn_accessories_completed_count_{window}
+    compatible_dimensions:
+    - window
+    overlap_possible: false
+    is_active: true
+  - dimension_key: customer_state
+    label_vi: Trạng thái khách hàng
+    aliases:
+    - theo trạng thái
+    - từng trạng thái
+    - trạng thái khách hàng
+    - customer state
+    - customer status
+    - by status
+    strategy: boolean_segment
+    source_tables:
+    - feature.customer_cross_bu_feature
+    - feature.vinfast_transaction
+    members:
+    - key: active_gsm
+      label: Active GSM
+      business_unit: CROSS_BU
+      table: feature.customer_cross_bu_feature
+      flag: is_active_gsm_{window}
+    - key: active_vinfast
+      label: Active VinFast
+      business_unit: CROSS_BU
+      table: feature.customer_cross_bu_feature
+      flag: is_active_vinfast_{window}
+    - key: buyer
+      label: Buyer
+      business_unit: VINFAST
+      table: feature.vinfast_transaction
+      flag: is_vehicle_buyer
+    - key: owner
+      label: Owner
+      business_unit: VINFAST
+      table: feature.vinfast_transaction
+      flag: is_vehicle_owner
+    - key: handover_scheduled
+      label: Handover scheduled
+      business_unit: VINFAST
+      table: feature.vinfast_transaction
+      flag: is_vehicle_handover_scheduled
+    compatible_dimensions:
+    - window
+    overlap_possible: true
+    is_active: true
+  - dimension_key: window
+    label_vi: Cửa sổ thời gian
+    aliases:
+    - theo cửa sổ
+    - theo khoảng thời gian
+    - từng khoảng thời gian
+    - theo window
+    - by window
+    - time window
+    strategy: pivot_feature
+    source_tables:
+    - feature.customer_cross_bu_feature
+    - feature.gsm_transaction
+    - feature.vinfast_transaction
+    members: []
+    compatible_dimensions:
+    - business_unit
+    - service_type
+    - customer_state
+    overlap_possible: false
+    is_active: true
+  - dimension_key: snapshot_date
+    label_vi: Ngày snapshot
+    aliases:
+    - theo snapshot
+    - theo ngày snapshot
+    - lịch sử snapshot
+    - by snapshot
+    - snapshot date
+    strategy: physical_column
+    source_tables:
+    - feature.customer_cross_bu_feature
+    - feature.gsm_transaction
+    - feature.vinfast_transaction
+    members: []
+    compatible_dimensions: []
+    overlap_possible: false
+    is_active: true
   feature_count: 406
   note: 'Sinh tự động — KHÔNG sửa tay. Nguồn: app/semantic/feature_spec.py + feature_describer.py'
 features:

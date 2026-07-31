@@ -3,6 +3,13 @@
 Nguồn: `SPRINT_2_TASK_TRACKER_CODEX.md`. File này là bản **đã map vào code thật** của repo:
 mỗi task ghi rõ chạm file nào, làm gì, test gì mới coi là xong.
 
+> **Rà soát lại ngày 2026-07-30:** DB local đang ở Alembic `0013 (head)`; golden set có
+> 86 case (57 dev / 29 holdout) và baseline Sprint 1 đã được lưu tại
+> `backend/reports/eval_sprint1_final_dev.md`. Nhóm test thuần code cho Sprint 2 có
+> **84 pass, 1 fail**: `test_narrow_features_lose_to_the_general_one` kỳ vọng feature hẹp
+> còn nằm top-5, nhưng retriever hiện loại nó khỏi top-5. Đây là regression retrieval cần
+> xử lý trước khi chốt benchmark, không phải lý do để đánh dấu toàn bộ Sprint 2 hoàn tất.
+
 Trạng thái đầu sprint: Sprint 1 xong (103/106 test pass — 3 đỏ vì thiếu GRANT, xem `TODO.md`).
 Task **2.5 và 2.10 đã có sẵn từ Sprint 1** — chỉ bổ sung, không viết lại.
 
@@ -60,14 +67,14 @@ Nhánh 2.5 → 2.6 chạy song song được.
 
 ---
 
-## Task 2.1 — `raw.vinfast_order_status_history` + `raw.vinfast_vehicle_handover`
+## Task 2.1 — `raw.vinfast_order_status_history` + `raw.vinfast_vehicle_handover` ✅ implementation + migration
 
 **Mục tiêu:** có event time thật để dựng trạng thái tại thời điểm bất kỳ.
 Hiện `raw.vinfast_orders` chỉ có `status` + `updated_at` — không dựng lại quá khứ được.
 
 **File:** `backend/migrations/versions/0003_vinfast_event_history.py`
 
-- [ ] `raw.vinfast_order_status_history`:
+- [x] `raw.vinfast_order_status_history`:
       grain = **1 dòng / (order_id, status, status_at)**.
       ```
       status_history_id BIGSERIAL PK
@@ -78,7 +85,7 @@ Hiện `raw.vinfast_orders` chỉ có `status` + `updated_at` — không dựng 
       UNIQUE (order_id, status, status_at)
       INDEX (order_id, status_at)
       ```
-- [ ] `raw.vinfast_vehicle_handover`:
+- [x] `raw.vinfast_vehicle_handover`:
       grain = **1 dòng / (order_id, vehicle_id)**.
       ```
       handover_id    BIGSERIAL PK
@@ -96,10 +103,10 @@ Hiện `raw.vinfast_orders` chỉ có `status` + `updated_at` — không dựng 
       CONSTRAINT chk_handover_reversed_needs_time
           CHECK (handover_status <> 'reversed' OR reversed_at IS NOT NULL)
       ```
-- [ ] `downgrade()` drop 2 bảng — Alembic bắt buộc, đừng để `pass`.
-- [ ] REVOKE cho `feature_agent_reader` là **tự động** (schema `raw` đã revoke ở
+- [x] `downgrade()` drop 2 bảng — Alembic bắt buộc, đừng để `pass`.
+- [x] REVOKE cho `feature_agent_reader` là **tự động** (schema `raw` đã revoke ở
       `db/schema/*.sql` mục 7 + default privileges). Chỉ cần verify, không thêm GRANT.
-- [ ] `tests/test_vinfast_event_history.py`: insert handover `completed` thiếu
+- [x] `tests/test_vinfast_event_history.py`: insert handover `completed` thiếu
       `handed_over_at` ⇒ `IntegrityError`; insert trùng `(order_id, vehicle_id)` ⇒ lỗi;
       `test_no_order_has_two_terminal_statuses` — không `order_id` nào có cả `completed`
       và `cancelled` trong history (`completed` là trạng thái cuối, chốt ở
@@ -157,14 +164,14 @@ Còn chờ admin: `alembic upgrade head` (0003+0004) → `generate_mock_data` �
 
 ---
 
-## Task 2.3 — `feature.customer_cross_bu_feature` ✅ code xong, chờ seed
+## Task 2.3 — `feature.customer_cross_bu_feature` ✅ implementation + seed path hoàn tất
 
 **Mục tiêu:** trả lời cross-BU bằng **1 bảng đã tính sẵn**, không để LLM tự join.
 
 **File:** `backend/migrations/versions/0005_create_customer_cross_bu_feature.py`,
 `feature_spec.py`, `generate_mock_data.py`
 
-- [ ] Bảng, grain `PRIMARY KEY (customer_id, snapshot_date)` — trùng grain 2 bảng hiện có:
+- [x] Bảng, grain `PRIMARY KEY (customer_id, snapshot_date)` — trùng grain 2 bảng hiện có:
       ```
       is_active_gsm_l1m           BOOLEAN
       is_active_vinfast_l1m       BOOLEAN
@@ -182,21 +189,21 @@ Còn chờ admin: `alembic upgrade head` (0003+0004) → `generate_mock_data` �
       lặng. "Bao nhiêu chủ xe" → bảng VinFast; "chủ xe có đi GSM không" →
       `gsm_active_vehicle_owner_flag`. `all_features()` có chốt chặn trùng tên toàn cục.
       Nhãn `business_unit` của bảng này là **`CROSS_BU`**, không phải VINFAST.
-- [ ] **Chốt null/zero semantics và ghi vào `null_meaning` của catalog** (cột này đã có sẵn,
+- [x] **Chốt null/zero semantics và ghi vào `null_meaning` của catalog** (cột này đã có sẵn,
       frontend đang hiển thị):
       - khách chưa từng có đơn VF ⇒ `vinfast_spend_l1m = NULL` (không phải 0) — "không có
         dữ liệu" khác "chi tiêu bằng 0".
       - `combined_spend_l1m = COALESCE(gsm,0) + COALESCE(vf,0)`, NULL chỉ khi cả hai NULL.
       - `dominant_business_unit_l1m = NULL` khi combined = 0 hoặc NULL. Bằng nhau ⇒ `'TIE'`,
         đừng lặng lẽ chọn GSM.
-- [ ] `cross_bu_engagement_score`: chốt công thức đơn giản, ghi vào description —
+- [x] `cross_bu_engagement_score`: chốt công thức đơn giản, ghi vào description —
       `min(gsm, vf) / max(gsm, vf)` trên spend đã chuẩn hóa (0 = một phía, 1 = cân bằng).
       Đừng bịa công thức phức tạp không giải thích được cho business.
-- [ ] Build bằng **FULL OUTER JOIN** trên `(customer_id, snapshot_date)` — INNER JOIN sẽ
+- [x] Build bằng **FULL OUTER JOIN** trên `(customer_id, snapshot_date)` — INNER JOIN sẽ
       mất khách một-BU, đúng cái nhóm cần đếm nhất.
-- [ ] Thêm synonyms VI: "khách dùng cả hai", "vừa đi GSM vừa mua VinFast", "chủ xe đi GSM",
+- [x] Thêm synonyms VI: "khách dùng cả hai", "vừa đi GSM vừa mua VinFast", "chủ xe đi GSM",
       "khách chung", "overlap" (`feature_describer.SYNONYMS`, không hand-write description).
-- [ ] `tests/test_cross_bu_feature.py`:
+- [x] `tests/test_cross_bu_feature.py`:
       - `COUNT(*) == COUNT(DISTINCT (customer_id, snapshot_date))` — không nhân dòng.
       - Tổng `gsm_spend_l1m` khớp tổng từ `feature.gsm_transaction` cùng snapshot.
       - Khách VF-only (mock `cid % 20 == 3`) có mặt trong bảng với `gsm_spend_l1m IS NULL`.
@@ -313,22 +320,21 @@ theo `session_id`, 7 test. Chỉ thêm phần Sprint 2 thiếu:
 
 ---
 
-## Task 2.9 — Result interpretation & visualization
+## Task 2.9 — Result interpretation & visualization ✅ implementation hoàn tất
 
-**Đã có:** `ResultChart.tsx` (bar), `ResultView.tsx` (toggle bảng/chart), `SqlPanel`,
-coverage + confidence + warning trong `AskResponse`. Việc còn lại:
+**Đã có:** `ResultChart.tsx` (bar/line), `ResultView.tsx` (KPI/bảng/chart), `SqlPanel`,
+coverage + confidence + warning trong `AskResponse`.
 
-- [ ] Phân loại result shape ở **backend** (`app/agent/pipeline.py`, ~15 dòng):
+- [x] Phân loại result shape ở **backend** (`app/agent/result_shape.py`, gọi từ `pipeline.py`):
       1 dòng × 1 cột ⇒ `scalar`; cột 1 là date ⇒ `time_series`;
       cột 1 text + cột 2 số ⇒ `category`; còn lại ⇒ `table`.
       Trả `result_shape` trong `AskResponse` + mirror sang `frontend/src/types.ts`.
-- [ ] Frontend map shape → view: `scalar` → KPI card (component mới ~20 dòng),
-      `time_series` → `LineChart` (recharts đã cài), `category` → bar (đã có),
-      `table` → bảng (đã có).
-- [ ] Cảnh báo hiển thị rõ (đã có chỗ, cần thêm nội dung):
+- [x] Frontend map shape → view: `scalar` → KPI card, `time_series` → `LineChart`
+      (recharts đã cài), `category` → bar, `table` → bảng.
+- [x] Cảnh báo hiển thị rõ:
       low coverage (`non_null_ratio < 0.3`), partial answer (có `assumptions`),
       cross-BU coverage thấp (UC2-06).
-- [ ] `tests/test_result_shape.py` — 4 case, thuần hàm, không cần DB.
+- [x] `tests/test_result_shape.py` — 5 case, thuần hàm, không cần DB.
 
 **Bỏ bớt:** `metadata.visualization_config` (bảng DB) và `chart_spec.schema.json`. Quy tắc
 chọn chart là 4 dòng `if`; đưa vào DB nghĩa là mỗi lần đổi chart phải chạy migration.
@@ -336,37 +342,44 @@ chọn chart là 4 dòng `if`; đưa vào DB nghĩa là mỗi lần đổi chart
 
 ---
 
-## Task 2.10 — Chat UI (bổ sung nhỏ)
+## Task 2.10 — Chat UI (bổ sung nhỏ) ✅ hoàn tất
 
 **Đã có:** chat, table/chart, SQL + copy, confidence/coverage, technical details, CSV,
 `session_id` giữ qua lượt.
 
-- [ ] Nút **hủy câu hỏi đang chờ** (gửi "hủy" — backend đã hiểu từ này).
-- [ ] Hiển thị `join_explanation` khi câu trả lời dùng cross-BU (user cần biết dữ liệu ghép
-      thế nào mới tin được số).
-- [ ] Nút trả lời nhanh "GSM" / "VinFast" khi backend trả `clarify` về BU.
+- [x] Nút **hủy câu hỏi đang chờ** (gửi "hủy" — backend đã hiểu từ này).
+- [x] Hiển thị `join_explanation` khi câu trả lời dùng cross-BU (backend đã trả field này;
+      user cần biết dữ liệu ghép thế nào mới tin được số).
+- [x] Nút trả lời nhanh động từ `clarification_options` khi backend trả `clarify` về BU
+      (và các slot khác); không còn hardcode chỉ GSM/VinFast.
 
 ---
 
-## Task 2.11 — Benchmark Sprint 2
+## Task 2.11 — Benchmark Sprint 2 🟡 dev LLM đạt 86%, còn 5 mismatch trước holdout
 
 **File:** `data/golden_set.yaml`, `scripts/golden_dataset.py`, `scripts/run_eval.py` (dùng lại
 nguyên hạ tầng Sprint 1 — chỉ thêm case và category).
 
-- [ ] Chạy `run_eval --split dev --tag sprint1_final` **TRƯỚC** khi sửa gì → có mốc so sánh.
-      Hiện chưa có số baseline nào được ghi lại; không có mốc thì không chứng minh được
-      Sprint 2 không làm hỏng Sprint 1.
-- [ ] Thêm ≥30 case vào `golden_set.yaml` — **mỗi UC2-01…UC2-30 ít nhất một dòng**
+- [x] Có baseline `run_eval --split dev --tag sprint1_final`: `execution_acc=28/30 (93%)`,
+      `task_success_rate=95%`, lưu ở `backend/reports/eval_sprint1_final_dev.md`.
+- [x] Thay bằng golden set Sprint 2 v2 — hiện có 100 case, dev/holdout là 70/30;
+      **mỗi UC2-01…UC2-30 ít nhất một dòng**
       (`docs/sprint2_definition_of_done.md` §3). Category mới: `cross_bu`, `buyer_vs_owner`,
       `point_in_time`, `multi_turn`, `join_safety`. Chia dev/holdout theo tỉ lệ cũ (2:1),
       nhưng **4 case an toàn UC2-24…UC2-27 để cả ở dev** — safety không tuning được thì
       không có lý do giấu vào holdout.
-- [ ] Cập nhật `scripts/golden_dataset.py`: hiện nó **báo lỗi nếu có case cross-BU**
-      (`expected_business_unit not in (GSM, VINFAST)`) — đổi thành cho phép `CROSS_BU`.
-- [ ] Sinh lại `HOLDOUT_CHECKSUM` + `HOLDOUT_VERSION` sau khi thêm case, rồi **không đụng nữa**.
-- [ ] Chạy dev → sửa → chạy dev. Holdout **chạy đúng 1 lần** ở cuối sprint.
-- [ ] `reports/sprint2_evaluation.md` + failure analysis (mỗi case fail: 1 dòng nguyên nhân
-      thuộc tầng nào — retrieval / join / generation / execution).
+- [x] `scripts/golden_dataset.py` đã cho phép `CROSS_BU` và báo coverage theo category/BU.
+- [x] Holdout đã khóa lại: `HOLDOUT_VERSION=3`, checksum có trong `backend/data/HOLDOUT_CHECKSUM`.
+- [ ] Seed 100 case vào `eval.query_test_case` sau khi admin chạy migration `0014`; tài khoản
+      runtime hiện không phải owner bảng nên không thể đổi constraint category mới.
+- [x] Chạy dev offline sau khi sửa regression: tag `sprint2-retrieval-v2-offline` đạt
+      retrieval `38/38`, refusal `19/19`, gold SQL `38/38`; xem `reports/sprint2_evaluation.md`.
+- [x] Dev LLM tag `sprint2-v7` (prompt thực tế `sprint2-v8`, model `deepseek-v4-flash`):
+      retrieval/refusal/SQL executable `100%`, execution `33/38 (86%)`, task success `91%`,
+      latency p95 `10.655s`.
+- [ ] Phân tích và sửa 5 mismatch dev (2 `buyer_vs_owner`, 3 `single_feature`), chạy lại
+      dev với tag mới; **chỉ sau đó** chạy holdout đúng một lần.
+- [x] `reports/sprint2_evaluation.md` + failure analysis theo retrieval/breakdown/generator.
 
 ### Bảng metric (Definition of Done)
 

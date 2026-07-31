@@ -117,7 +117,7 @@ def _trace_schema_valid(trace: list[dict[str, Any]]) -> bool | None:
     return validations[-1] == "valid" if validations else None
 
 
-def evaluate(tag: str = "baseline", split: str = "dev") -> dict[str, Any]:
+def evaluate(tag: str = "baseline", split: str = "dev", *, offline: bool = False) -> dict[str, Any]:
     settings = get_settings()
     cases = cases_for_split(split)
     errors = validate_cases(cases)
@@ -126,7 +126,7 @@ def evaluate(tag: str = "baseline", split: str = "dev") -> dict[str, Any]:
     # Đo trên holdout thì bắt buộc holdout đã khóa & nguyên vẹn (chống leakage).
     lock_status = assert_holdout_unchanged() if split in ("holdout", "all") else "dev split (holdout không dùng)"
 
-    llm_on = bool(settings.llm_api_key)
+    llm_on = bool(settings.llm_api_key) and not offline
     router = RuleRouter()
     layer = get_semantic_layer()
     pipeline = AgentPipeline(SQLGenerator(OpenAIJSONClient(settings))) if llm_on else None
@@ -366,7 +366,9 @@ def format_report(report: dict[str, Any]) -> str:
         for r in answerable
     ]
     mrr = "n/a" if not first_ranks else f"{sum(1 / rank for rank in first_ranks if rank) / len(first_ranks):.3f}"
-    task_outcomes = [r.result_correct for r in answerable] + [r.refusal_correct for r in guardrail]
+    task_outcomes = [r.refusal_correct for r in guardrail]
+    if report["llm_on"]:
+        task_outcomes = [r.result_correct for r in answerable] + task_outcomes
     clarification_precision, clarification_recall = _precision_recall(results, "clarify", "clarify")
     refusal_precision, refusal_recall = _precision_recall(results, "out_of_scope", "out_of_scope")
     expected_ok = [r for r in results if r.kind != "skipped" and r.expected_status == "ok"]
@@ -393,8 +395,12 @@ def format_report(report: dict[str, Any]) -> str:
     lines.append(f"  Execution success | valid      : {_funnel_rate(valid_sql, 'generated_sql_executes')}")
     lines.append(f"  Result match | executed        : {_funnel_rate(executed_sql, 'result_correct')}")
     lines.append("\n[End-to-end]")
-    lines.append(f"  result_match_accuracy         : {_percent([r.result_correct for r in answerable])}")
-    lines.append(f"  task_success_rate             : {_percent(task_outcomes)}")
+    if report["llm_on"]:
+        lines.append(f"  result_match_accuracy         : {_percent([r.result_correct for r in answerable])}")
+        lines.append(f"  task_success_rate             : {_percent(task_outcomes)}")
+    else:
+        lines.append("  result_match_accuracy         : n/a (LLM off)")
+        lines.append("  task_success_rate             : n/a (LLM off)")
     lines.append("\n[Clarification / refusal]")
     lines.append(f"  clarification_precision       : {clarification_precision}")
     lines.append(f"  clarification_recall          : {clarification_recall}")

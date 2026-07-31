@@ -82,31 +82,28 @@ Xem "Chặn ngay" bên dưới.
 
 | Task | Trạng thái |
 |---|---|
-| 2.0 Scope freeze, ADR, contracts | 🟡 5 doc + 2 ADR đã soạn (`docs/`), chờ business xác nhận |
-| 2.1 `raw.vinfast_order_status_history` + `vehicle_handover` | ❌ |
-| 2.2 PIT VinFast feature pipeline | ❌ (mock có as-of snapshot nhưng không dựng từ event history) |
-| 2.3 `feature.customer_cross_bu_feature` | ❌ |
-| 2.4 Join catalog + Join Planner | ❌ |
-| 2.5 Short-term clarification state | ✅ v1 (lazy) — còn thiếu slot model tường minh |
-| 2.6 Multi-turn orchestrator | 🟡 merge-and-rerun chạy; chưa có join plan / revalidate sau merge |
-| 2.7 Generator v2 | ❌ vẫn v1 |
-| 2.8 Validator v2 | 🟡 guard đã lên AST + reader role + timeout; thiếu join-vs-catalog, max joins, cost |
-| 2.9 Visualization | 🟡 bar chart + coverage/warning; chưa có result-shape classifier / `chart_spec` |
-| 2.10 Chat UI | ✅ |
-| 2.11 Sprint 2 benchmark | 🟡 hạ tầng eval dùng lại được; benchmark hiện **0 case cross-BU** |
+| 2.0 Scope freeze, ADR, contracts | 🟡 tài liệu đã soạn; còn xác nhận nghiệp vụ/ADR |
+| 2.1 Event history + vehicle handover | ✅ migration + test đã có; DB local ở `0013 (head)` |
+| 2.2 PIT VinFast feature pipeline | ✅ mock/PIT feature/invariant/test đã có |
+| 2.3 `feature.customer_cross_bu_feature` | ✅ materialized feature + semantic metadata + test đã có |
+| 2.4 Join catalog + Join Planner | ✅ |
+| 2.5 Short-term clarification state | ✅ |
+| 2.6 Multi-turn orchestrator | ✅ |
+| 2.7 Generator v2 | ✅ prompt v8 + context/repair contract |
+| 2.8 Validator v2 | ✅ runtime join guard, quota, audit, timeout |
+| 2.9 Visualization | ✅ backend result-shape + KPI/bar/line/table + warnings |
+| 2.10 Chat UI | ✅ chat/clarification động/KPI-bảng-biểu đồ/`join_explanation` |
+| 2.11 Sprint 2 benchmark | 🟡 golden v2: 100 case (70 dev/30 holdout), checksum v3; DB seed chờ migration admin; dev cũ đạt execution 86% |
 
-Cross-BU và vehicle handover đang bị **chủ động refuse** trong `app/agent/router.py`
-(đúng scope Sprint 1). Mở khóa là bước cuối sau 2.1→2.3, không phải bước đầu.
-
-**Đường ngắn nhất vào Sprint 2:** 2.1 → 2.2 → 2.3 → 2.4, rồi gỡ refusal ở
-[router.py:120](backend/app/agent/router.py#L120) và [router.py:74](backend/app/agent/router.py#L74).
-2.5 và 2.10 coi như xong — đừng làm lại.
+Cross-BU, buyer/owner và handover đã được mở theo semantic contract. Việc ưu tiên còn lại là
+phân tích 5 mismatch dev (đặc biệt buyer/owner), chạy lại dev, rồi chạy holdout đúng một lần.
 
 ## Còn lại (Sprint 1)
 
 - [x] README (setup/run/seed/test), Docker Compose Postgres và Sprint 1 runbook.
-- [ ] Chạy e2e với LLM thật + ghi số baseline `run_eval --split dev` vào `reports/`
-      (hiện chưa có bản ghi before/after nào).
+- [x] Chạy e2e với LLM thật + ghi baseline Sprint 1 vào
+      `backend/reports/eval_sprint1_final_dev.md` (`execution_acc=93%`); Sprint 2 v6
+      được ghi trong `prompts/CHANGELOG.md`.
 - [ ] Test metadata idempotency trực tiếp trên PG (đã verify tay).
 
 ## Nợ kỹ thuật (shortcut có chủ đích — ghi rõ trần & upgrade path)

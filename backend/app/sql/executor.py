@@ -11,6 +11,7 @@ import time
 from typing import Any, Iterable
 
 from sqlalchemy import text
+from sqlalchemy import inspect
 
 from app.config import Settings, get_settings
 from app.db import get_engine
@@ -33,6 +34,17 @@ def _prepare_query_connection(conn, settings: Settings) -> None:
         conn.execute(text(f"SET LOCAL statement_timeout = {settings.sql_timeout_ms}"))
 
 
+def _supports_breakdown_audit(conn) -> bool:
+    """Cho phép chạy code mới trước khi migration 0013 được apply trên dev DB."""
+    try:
+        return any(
+            column["name"] == "breakdown_plan"
+            for column in inspect(conn).get_columns("query_log", schema="agent")
+        )
+    except Exception:
+        return False
+
+
 def run_query(
     sql: str,
     settings: Settings | None = None,
@@ -40,6 +52,7 @@ def run_query(
     query_text: str | None = None,
     session_id: str | None = None,
     join_plan: dict | None = None,
+    breakdown_plan: dict | None = None,
     join_rules: Iterable[Any] = (),
     state_transition: dict | None = None,
 ) -> tuple[str, QueryResult]:
@@ -55,15 +68,25 @@ def run_query(
         safe_sql = validate_sql(sql, settings, join_plan=join_plan, join_rules=join_rules)
     except GuardError as exc:
         with engine.begin() as conn:
-            query_id = conn.execute(text("""
+            query_sql = """
                 INSERT INTO agent.query_log
-                  (session_id, query_text, generated_sql, execution_status, error_message, join_plan, state_transition)
+                  (session_id, query_text, generated_sql, execution_status, error_message,
+                   join_plan, breakdown_plan, state_transition)
+                VALUES (:session, :question, :sql, 'rejected', :error,
+                        CAST(:plan AS jsonb), CAST(:breakdown AS jsonb), CAST(:transition AS jsonb))
+                RETURNING query_id
+            """ if _supports_breakdown_audit(conn) else """
+                INSERT INTO agent.query_log
+                  (session_id, query_text, generated_sql, execution_status, error_message,
+                   join_plan, state_transition)
                 VALUES (:session, :question, :sql, 'rejected', :error,
                         CAST(:plan AS jsonb), CAST(:transition AS jsonb))
                 RETURNING query_id
-            """), {
+            """
+            query_id = conn.execute(text(query_sql), {
                 "session": session_id, "question": query_text or sql, "sql": sql, "error": str(exc),
                 "plan": json.dumps(join_plan) if join_plan else None,
+                "breakdown": json.dumps(breakdown_plan) if breakdown_plan else None,
                 "transition": json.dumps(state_transition) if state_transition else None,
             }).scalar_one()
             conn.execute(text("""
@@ -87,17 +110,26 @@ def run_query(
             raw_rows = result.fetchall()
     except Exception as exc:
         with engine.begin() as conn:
-            query_id = conn.execute(text("""
+            query_sql = """
+                INSERT INTO agent.query_log
+                  (session_id, query_text, generated_sql, validated_sql, execution_status,
+                   execution_time_ms, error_message, join_plan, breakdown_plan, state_transition)
+                VALUES (:session, :question, :sql, :safe, 'failed', :ms, :error,
+                        CAST(:plan AS jsonb), CAST(:breakdown AS jsonb), CAST(:transition AS jsonb))
+                RETURNING query_id
+            """ if _supports_breakdown_audit(conn) else """
                 INSERT INTO agent.query_log
                   (session_id, query_text, generated_sql, validated_sql, execution_status,
                    execution_time_ms, error_message, join_plan, state_transition)
                 VALUES (:session, :question, :sql, :safe, 'failed', :ms, :error,
                         CAST(:plan AS jsonb), CAST(:transition AS jsonb))
                 RETURNING query_id
-            """), {
+            """
+            query_id = conn.execute(text(query_sql), {
                 "session": session_id, "question": query_text or sql, "sql": sql, "safe": safe_sql,
                 "ms": int((time.perf_counter() - started) * 1000), "error": str(exc),
                 "plan": json.dumps(join_plan) if join_plan else None,
+                "breakdown": json.dumps(breakdown_plan) if breakdown_plan else None,
                 "transition": json.dumps(state_transition) if state_transition else None,
             }).scalar_one()
             conn.execute(text("""
@@ -122,19 +154,32 @@ def run_query(
         truncated=truncated,
     )
     with engine.begin() as conn:
-        query_id = conn.execute(text("""
+        query_sql = """
             INSERT INTO agent.query_log
               (session_id, query_text, selected_tables, generated_sql, validated_sql,
-               execution_status, row_count, execution_time_ms, result_preview, join_plan, state_transition)
+               execution_status, row_count, execution_time_ms, result_preview,
+               join_plan, breakdown_plan, state_transition)
             VALUES (:session, :question, CAST(:tables AS jsonb), :sql, :safe, 'executed',
-                    :count, :ms, CAST(:preview AS jsonb), CAST(:plan AS jsonb), CAST(:transition AS jsonb))
+                    :count, :ms, CAST(:preview AS jsonb), CAST(:plan AS jsonb),
+                    CAST(:breakdown AS jsonb), CAST(:transition AS jsonb))
             RETURNING query_id
-        """), {
+        """ if _supports_breakdown_audit(conn) else """
+            INSERT INTO agent.query_log
+              (session_id, query_text, selected_tables, generated_sql, validated_sql,
+               execution_status, row_count, execution_time_ms, result_preview,
+               join_plan, state_transition)
+            VALUES (:session, :question, CAST(:tables AS jsonb), :sql, :safe, 'executed',
+                    :count, :ms, CAST(:preview AS jsonb), CAST(:plan AS jsonb),
+                    CAST(:transition AS jsonb))
+            RETURNING query_id
+        """
+        query_id = conn.execute(text(query_sql), {
             "session": session_id, "question": query_text or sql,
             "tables": json.dumps(referenced_tables(safe_sql)), "sql": sql, "safe": safe_sql,
             "count": len(rows), "ms": int((time.perf_counter() - started) * 1000),
             "preview": json.dumps({"columns": columns, "rows": rows[:5]}, ensure_ascii=False),
             "plan": json.dumps(join_plan) if join_plan else None,
+            "breakdown": json.dumps(breakdown_plan) if breakdown_plan else None,
             "transition": json.dumps(state_transition) if state_transition else None,
         }).scalar_one()
         conn.execute(text("""

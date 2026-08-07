@@ -1,0 +1,95 @@
+version: 2
+
+models:
+  - name: silver_customer_snapshot
+    description: "Spine khách × snapshot. Grain: (customer_id, snapshot_date)."
+    columns:
+      - name: customer_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: source('raw', 'customers')
+                field: customer_id
+      - name: snapshot_date
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: source('raw', 'feature_snapshot')
+                field: snapshot_date
+
+  - name: silver_gsm_trip
+    description: "Trip GSM chuẩn hoá. Grain: (trip_id)."
+    columns:
+      - name: trip_id
+        data_tests: [unique, not_null]
+      - name: customer_id
+        data_tests: [not_null]
+      - name: trip_date
+        data_tests: [not_null]
+      - name: status_group
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [canceled, completed, other]
+      - name: is_weekday
+        data_tests: [not_null]
+      - name: is_daytime
+        data_tests: [not_null]
+
+  - name: silver_vinfast_order_state
+    description: >
+      Trạng thái đơn VinFast tại từng snapshot, đã lọc as-of.
+      Grain: (order_id, snapshot_date).
+    columns:
+      - name: order_id
+        data_tests: [not_null]
+      - name: snapshot_date
+        data_tests: [not_null]
+      - name: order_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [vehicle, accessories, work_order, nvso]
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [created, processing, completed, cancelled, delivered]
+      - name: has_discount
+        data_tests: [not_null]
+
+  - name: silver_vehicle_purchase
+    description: >
+      Tư cách người mua xe tại từng snapshot, lọc CHỈ theo status_at.
+      Cố tình không dùng bộ lọc as-of của silver_vinfast_order_state — xem
+      tests/assert_purchase_independent_of_delivery.sql.
+      Grain: (order_id, snapshot_date).
+    columns:
+      - name: order_id
+        data_tests: [not_null]
+      - name: customer_id
+        data_tests: [not_null]
+      - name: snapshot_date
+        data_tests: [not_null]
+      - name: completed_at
+        data_tests: [not_null]
+
+  - name: silver_vehicle_ownership
+    description: >
+      Quyền sở hữu xe tại từng snapshot, nguồn duy nhất là bảng bàn giao.
+      Grain: (handover_id, snapshot_date).
+    columns:
+      - name: handover_id
+        data_tests: [not_null]
+      - name: snapshot_date
+        data_tests: [not_null]
+      - name: vehicle_id
+        data_tests: [not_null]
+      - name: is_handed_over
+        data_tests: [not_null]
+      - name: is_owned
+        data_tests: [not_null]
+      - name: is_pending
+        data_tests: [not_null]

@@ -1,0 +1,18 @@
+# Biến DBT_* do backend/scripts/run_dbt.py nạp từ backend/.env.
+# ĐỪNG gọi `dbt` trực tiếp — các biến sẽ trống và dbt báo lỗi khó hiểu:
+#     cd backend && python -m scripts.run_dbt debug
+feature_store:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DBT_HOST') }}"
+      port: "{{ env_var('DBT_PORT') | as_number }}"
+      user: "{{ env_var('DBT_USER') }}"
+      password: "{{ env_var('DBT_PASSWORD') }}"
+      dbname: "{{ env_var('DBT_DBNAME') }}"
+      # Schema mặc định cho model không khai báo +schema. dbt_work là schema của
+      # riêng dbt (migration 0015) — không bao giờ là `feature`: gold chỉ được ghi
+      # qua publish_gold.py, dbt không có quyền DDL ở đó.
+      schema: dbt_work
+      threads: 4

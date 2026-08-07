@@ -1,0 +1,85 @@
+version: 2
+
+sources:
+  - name: raw
+    description: >
+      Event thô do Alembic sở hữu. Agent bị REVOKE ALL ở đây; chỉ dbt
+      (role dbt_transformer) được SELECT.
+    schema: raw
+    tables:
+      - name: customers
+        columns:
+          - name: customer_id
+            data_tests: [unique, not_null]
+
+      - name: date_dim
+        columns:
+          - name: date_id
+            data_tests: [unique, not_null]
+
+      - name: feature_snapshot
+        description: >
+          Các ngày mà feature.* được tính. Nguồn sự thật dùng chung Python <-> dbt
+          (migration 0015). Rỗng ⇒ mọi model silver trả 0 dòng.
+        columns:
+          - name: snapshot_date
+            data_tests:
+              - unique
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('raw', 'date_dim')
+                    field: date_id
+
+      - name: gsm_trips
+        columns:
+          - name: trip_id
+            data_tests: [unique, not_null]
+          - name: customer_id
+            data_tests:
+              - relationships:
+                  arguments:
+                    to: source('raw', 'customers')
+                    field: customer_id
+          - name: status
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: [created, accepted, in_progress, completed, cancelled]
+
+      - name: vinfast_orders
+        columns:
+          - name: order_id
+            data_tests: [unique, not_null]
+          - name: order_type
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: [vehicle, accessories, work_order, nvso]
+          - name: status
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: [created, processing, completed, cancelled, delivered]
+
+      - name: vinfast_order_status_history
+        description: >
+          `status_at` là cột DUY NHẤT được dùng trong lọc point-in-time.
+          `recorded_at` chỉ để audit độ trễ pipeline — không bao giờ lọc snapshot
+          (ADR 0002).
+        columns:
+          - name: status_history_id
+            data_tests: [unique, not_null]
+
+      - name: vinfast_vehicle_handover
+        description: >
+          Nguồn DUY NHẤT của quyền sở hữu xe. Không bao giờ suy ownership từ
+          vinfast_orders.status (docs/vehicle_owner_semantics.md).
+        columns:
+          - name: handover_id
+            data_tests: [unique, not_null]
+          - name: handover_status
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: [scheduled, completed, reversed]

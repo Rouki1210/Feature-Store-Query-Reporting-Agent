@@ -10,6 +10,7 @@ from typing import Any
 
 from sqlalchemy import text
 
+from app.config import get_settings
 from app.db import get_engine
 from app.semantic.feature_spec import ALL_TIME, SPRINT2_WINDOWS, WINDOW_DAYS, all_features
 from scripts.seed_metadata import (
@@ -19,13 +20,12 @@ from scripts.seed_metadata import (
 )
 
 RNG = random.Random(20260723)
-_snapshot_text = os.getenv("SNAPSHOT_DATE")
-try:
-    SNAPSHOT = date.fromisoformat(_snapshot_text) if _snapshot_text else date.today()
-except ValueError as exc:
-    raise ValueError("SNAPSHOT_DATE must use YYYY-MM-DD format") from exc
+# Qua settings (đọc .env) chứ không os.getenv: biến trong .env không được export ra
+# môi trường, nên đọc thẳng env sẽ âm thầm rơi về date.today() và phá parity.
+# pydantic tự validate định dạng YYYY-MM-DD.
+SNAPSHOT = get_settings().snapshot_date or date.today()
 UTC = timezone.utc
-CUSTOMER_COUNT = 600
+CUSTOMER_COUNT = 1000   
 # 6 snapshot cách ~30 ngày (cũ→mới), mới nhất = SNAPSHOT. Cho time-series /
 # window-compare / reporter đêm. ponytail: cách đều 30 ngày thay vì month-end
 # lịch để tránh số học tháng — đủ để test dịch chuyển MoM.
@@ -652,10 +652,11 @@ def seed() -> dict[str, int]:
         for table in ("feature.customer_cross_bu_feature",
                       "feature.vinfast_transaction", "feature.gsm_transaction",
                       "raw.vinfast_vehicle_handover", "raw.vinfast_order_status_history",
-                      "raw.vinfast_orders", "raw.gsm_trips", "raw.date_dim", "raw.customers"):
+                      "raw.vinfast_orders", "raw.gsm_trips","raw.feature_snapshot", "raw.date_dim", "raw.customers"):
             conn.execute(text(f"DELETE FROM {table}"))
         _insert(conn, "raw.customers", customers)
         _insert(conn, "raw.date_dim", dates)
+        _insert(conn, "raw.feature_snapshot", [{"snapshot_date": snap} for snap in SNAPSHOTS])
         _insert(conn, "raw.gsm_trips", trips)
         _insert(conn, "raw.vinfast_orders", orders)
         _insert(conn, "raw.vinfast_order_status_history", history)

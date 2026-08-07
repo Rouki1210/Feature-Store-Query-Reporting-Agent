@@ -1,0 +1,67 @@
+# Postgres + agent + Metabase trên cùng một network.
+# Trong network này gọi nhau bằng TÊN SERVICE, không phải localhost:
+#   Metabase → agent:   http://agent:8000
+#   Metabase → Postgres: host `db`, port 5432
+#   agent    → Postgres: postgresql+psycopg://...@db:5432/feature_store
+# Chỉ cổng publish ra host mới dùng localhost (agent 8000, Metabase 3000, db 5432).
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: feature_store
+    ports:
+      # Cấu hình được: máy dev có thể đã có Postgres khác giữ 5432. Đổi cổng PUBLISH
+      # không ảnh hưởng service khác trong network — chúng luôn gọi `db:5432`.
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # `-d feature_store` chứ không phải database mặc định: initdb tạo DB này ở
+      # bước cuối, healthcheck trên `postgres` sẽ báo ready trước khi nó tồn tại.
+      test: ["CMD-SHELL", "pg_isready -U postgres -d feature_store"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  agent:
+    build: ./backend
+    env_file:
+      - path: ./backend/.env
+        required: false      # chỉ cần khi bạn đặt LLM_API_KEY ở đó
+    environment:
+      # Ghi đè env_file: trong container, Postgres là `db`, không phải localhost.
+      DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/feature_store
+      # Vite dev trên host + Metabase (nếu gọi API bằng JS trong TRÌNH DUYỆT; gọi
+      # server-side từ trong container thì CORS không liên quan). 3000 = Metabase
+      # bundled, 3001 = Metabase chạy sẵn trên máy này.
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://localhost:3001
+      LLM_API_KEY: ${LLM_API_KEY:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Chỉ chạy khi bạn CHƯA có Metabase: `docker compose --profile metabase up -d`.
+  # Đã có Metabase riêng thì bỏ qua service này và trỏ nó tới agent bằng
+  # http://host.docker.internal:8000 (khác network), hoặc `docker network connect`.
+  metabase:
+    profiles: ["metabase"]
+    image: metabase/metabase:latest
+    ports:
+      - "${METABASE_PORT:-3000}:3000"
+    volumes:
+      - metabase:/metabase-data
+    environment:
+      # H2 file-based: đủ cho local. Production thì trỏ MB_DB_* sang Postgres riêng
+      # — KHÔNG dùng `feature_store`, Metabase sẽ ghi vào đó.
+      MB_DB_FILE: /metabase-data/metabase.db
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  metabase:

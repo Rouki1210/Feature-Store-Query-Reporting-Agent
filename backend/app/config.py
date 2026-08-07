@@ -5,6 +5,7 @@ Mọi hằng số vận hành đều đi qua đây.
 """
 from __future__ import annotations
 
+from datetime import date
 from functools import lru_cache
 
 from pydantic import Field
@@ -68,6 +69,18 @@ class Settings(BaseSettings):
     # TTL của pending question (short-term state). Hết hạn ⇒ coi câu trả lời ngắn
     # là câu hỏi mới. Spec đề xuất 10–15 phút.
     conversation_ttl_seconds: int = Field(default=900, alias="CONVERSATION_TTL_SECONDS")
+
+    # ---- dbt transform layer ----
+    # Role least-privilege mà dbt và publish_gold dùng: DML trên feature.*, toàn
+    # quyền trên silver/dbt_work, KHÔNG có DDL trên feature.* (xem migration 0015).
+    # Migration 0015 bắt buộc phải có giá trị này — không hardcode credential.
+    dbt_transformer_password: str = Field(default="", alias="DBT_TRANSFORMER_PASSWORD")
+
+    # ---- Mock data ----
+    # Ngày snapshot MỚI NHẤT của bộ mock (5 snapshot còn lại lùi dần 30 ngày).
+    # Bỏ trống ⇒ date.today() ⇒ seed lại vào ngày khác cho ra bộ snapshot khác,
+    # và mọi so sánh parity legacy-vs-dbt fail giả. Ghim trong .env.
+    snapshot_date: date | None = Field(default=None, alias="SNAPSHOT_DATE")
 
     # ---- App ----
     semantic_layer_path: str = Field(

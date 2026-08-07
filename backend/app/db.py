@@ -26,6 +26,10 @@ def get_engine() -> Engine:
             settings.database_url,
             future=True,
             connect_args=connect_args,
+            # Container Postgres bị recreate ⇒ IP mới ⇒ mọi kết nối trong pool thành
+            # rác, và app kẹt ở `db_unavailable` cho tới khi restart tay. Ping trước
+            # khi mượn kết nối để pool tự loại bỏ connection chết.
+            pool_pre_ping=True,
         )
     return _engine
 

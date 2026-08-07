@@ -21,6 +21,13 @@ env/
 backend/data/*.sqlite
 backend/data/*.sqlite3
 
+# --- dbt ---
+# Artefact biên dịch + log. dbt/models, macros, tests thì PHẢI commit.
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+dbt/package-lock.yml
+
 # --- Node / frontend ---
 node_modules/
 dist/

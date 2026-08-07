@@ -1,0 +1,9 @@
+# Phụ thuộc của TẦNG PIPELINE (dbt, sau này thêm Dagster).
+# Cố tình tách khỏi requirements.txt: image agent không cần dbt, mà dbt kéo theo
+# ~30 package (metricflow, protobuf, snowplow-tracker, psycopg2-binary...).
+#
+#     pip install -r requirements-pipeline.txt
+#
+# Cảnh báo: dbt-postgres hạ protobuf xuống <7 (7.35 -> 6.33). Nếu về sau có thư viện
+# trong venv này cần protobuf 7, tách venv riêng cho pipeline thay vì gỡ dbt.
+dbt-postgres>=1.11

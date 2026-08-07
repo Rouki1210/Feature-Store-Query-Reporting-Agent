@@ -1,0 +1,40 @@
+name: feature_store
+version: "1.0.0"
+config-version: 2
+profile: feature_store
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+flags:
+  # Pipeline dữ liệu nội bộ, không gửi thống kê ẩn danh ra ngoài.
+  send_anonymous_usage_stats: false
+
+vars:
+  # Múi giờ dùng để cắt ranh giới NGÀY (snapshot_date, trip_date, active_day_count...).
+  #
+  # UTC vì mock data sinh datetime UTC-aware rồi gọi .date() trên đó — parity với bản
+  # Python bắt buộc phải theo. Warehouse thật gần như chắc chắn cắt ngày theo giờ Việt
+  # Nam: `2026-08-01 06:30+07` là 2026-07-31 theo UTC, lệch NGUYÊN MỘT NGÀY, và mọi
+  # feature daily / l1w / active_day_count sẽ sai ở biên.
+  #
+  # Đổi Ở ĐÂY khi cắm warehouse thật, không đi sửa 15 chỗ rải rác trong model và test.
+  business_timezone: "UTC"
+
+models:
+  feature_store:
+    # Chuẩn hoá event + quy tắc point-in-time. View: dữ liệu nhỏ, luôn tươi,
+    # không tốn chỗ, và đọc được lineage thẳng từ raw.
+    silver:
+      +schema: silver
+      +materialized: view
+
+    # Bảng candidate — bản nháp của feature.*, được dbt test TRƯỚC khi publish.
+    # Table chứ không view: test chạy nhiều lần trên cùng dữ liệu, và parity_check
+    # --source dbt_work so trực tiếp với baseline.
+    int:
+      +schema: dbt_work
+      +materialized: table

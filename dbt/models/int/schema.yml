@@ -1,0 +1,77 @@
+version: 2
+
+models:
+  - name: int_gsm_feature_candidate
+    description: >
+      Bản nháp của feature.gsm_transaction (alias dbt_work.gsm_transaction).
+      Test chạy ở đây, TRƯỚC khi publish_gold.py ghi sang feature.*.
+    columns:
+      - name: customer_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: source('raw', 'customers')
+                field: customer_id
+      - name: snapshot_date
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: source('raw', 'feature_snapshot')
+                field: snapshot_date
+
+  - name: int_vinfast_feature_candidate
+    description: >
+      Bản nháp của feature.vinfast_transaction (alias dbt_work.vinfast_transaction).
+    columns:
+      - name: customer_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: source('raw', 'customers')
+                field: customer_id
+      - name: snapshot_date
+        data_tests: [not_null]
+      - name: is_vehicle_buyer
+        data_tests: [not_null]
+      - name: is_vehicle_owner
+        data_tests: [not_null]
+      - name: is_vehicle_handover_scheduled
+        data_tests: [not_null]
+
+  - name: int_cross_bu_candidate
+    description: >
+      Bản nháp của feature.customer_cross_bu_feature (alias
+      dbt_work.customer_cross_bu_feature). Bảng tính sẵn theo ADR 0001.
+    columns:
+      - name: customer_id
+        data_tests: [not_null]
+      - name: snapshot_date
+        data_tests: [not_null]
+      # NULL là giá trị HỢP LỆ và có nghĩa riêng cho spend/dominant (chưa từng có dữ
+      # liệu ở đơn vị đó), nên KHÔNG đặt not_null lên chúng. Các cờ is_* thì luôn có giá trị.
+      - name: is_active_gsm_l1m
+        data_tests: [not_null]
+      - name: is_active_vinfast_l1m
+        data_tests: [not_null]
+      - name: is_cross_bu_active_l1m
+        data_tests: [not_null]
+      - name: gsm_active_vehicle_owner_flag
+        data_tests: [not_null]
+      # Viết thẳng 5 cửa sổ: dbt KHÔNG render Jinja trong file property (.yml mô tả
+      # model), chỉ render trong .sql. Vòng lặp ở đây sẽ lỗi parse YAML.
+      - name: dominant_business_unit_l1m
+        data_tests: &dominant_values
+          - accepted_values:
+              arguments:
+                values: ['GSM', 'VINFAST', 'TIE']
+      - name: dominant_business_unit_l3m
+        data_tests: *dominant_values
+      - name: dominant_business_unit_l6m
+        data_tests: *dominant_values
+      - name: dominant_business_unit_l12m
+        data_tests: *dominant_values
+      - name: dominant_business_unit_all
+        data_tests: *dominant_values

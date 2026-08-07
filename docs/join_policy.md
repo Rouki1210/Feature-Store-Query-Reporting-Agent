@@ -18,7 +18,7 @@ trông hợp lý. Đây là lỗi nguy hiểm nhất của Sprint 2 và phải b
 ## 2. Thứ tự ưu tiên khi trả lời câu hỏi cross-BU
 
 1. **`feature.customer_cross_bu_feature`** — nếu bảng tính sẵn phủ được câu hỏi thì dùng, KHÔNG join.
-   Đây là đường mặc định (lý do: `docs/adr/0001-cross-bu-precomputed-table.md`).
+   Đây là đường mặc định (lý do: `decisions.md#0001`).
 2. Join theo `metadata.join_catalog` — chỉ khi cần cột không có trong bảng tính sẵn.
 3. Không thuộc 1 và 2 ⇒ **từ chối**, trả lời "chưa hỗ trợ", không tự chế join.
 

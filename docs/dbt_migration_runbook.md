@@ -360,43 +360,216 @@ run_eval --offline      = gold_sql_ok 72/72, retrieval 59/72, refusal 23/28
 
 </details>
 
-### ☐ Bước 7 — Cutover (CHỈ khi bước 6 xanh hết)
+### ✅ Bước 7 — Cutover
 
-Đến lúc này mới xoá khỏi `generate_mock_data.py`: `build_features`, `build_cross_bu`, `_within`,
-`_ratio`, `_vehicle_pit`, `data_quality_errors`, `cross_bu_errors` (~350 dòng).
-**Giữ nguyên `RNG = random.Random(20260723)`** — mất seed là mất parity vĩnh viễn.
+Đã xoá khỏi `generate_mock_data.py` **414 dòng**: `build_features`, `build_cross_bu`,
+`_within`, `_ratio`, `_vehicle_pit`, `_cutoff`, `data_quality_errors`, `cross_bu_errors`.
+`RNG = random.Random(20260723)` giữ nguyên — seed vẫn sinh đúng 1000 khách / 25.505 trip
+/ 6.781 đơn như bộ đã dựng nên baseline `parity`.
 
-Trước đó, ở bước 6 nên thêm cờ `--legacy-transform` cho generator để chạy song song hai đường;
-đó cũng là đường rollback.
+`seed()` vẫn XOÁ `feature.*` dù không còn ghi vào đó: gold suy ra từ raw, thay raw mà giữ
+gold là để agent trả lời bằng số của bộ dữ liệu cũ. Rỗng là hỏng ồn ào, stale là sai trong
+im lặng. `main()` in ra hai lệnh nạp lại.
 
-### ☐ Bước 8 — Dagster (2 job TÁCH RỜI)
+**Không thêm cờ `--legacy-transform`.** Kế hoạch ban đầu định dùng nó làm đường rollback,
+nhưng bước 3-6 đã chạy song song xong và parity đã chốt; giữ 414 dòng sau một cờ nghĩa là
+giữ một bản transform thứ hai không ai chạy, không ai test, và sẽ trôi khỏi bản dbt.
+Rollback = `git revert` commit cutover, cùng hiệu quả và không để lại nợ.
 
-- `dev_seed_job` — **không có schedule**, chạy tay: `raw_events` → dbt → `publish_gold` →
-  `seed_metadata` → `run_eval`
-- `nightly_job` — có schedule: asset check "raw đã ingest" → dbt → `publish_gold` → nightly report.
-  **Không bao giờ gọi mock generator.**
+#### Phần khó không nằm ở việc xoá: 31 test Python sống nhờ đúng đoạn code đó
 
-`seed_metadata` không chạy hàng đêm — nó đè synonym/business term chỉnh tay; chỉ chạy khi
-`feature_spec.py` đổi. Tối thiểu phải có `retry_policy`, run timeout, `concurrency=1` cho publish,
-schedule timezone. Service `dagster` để sau profile `orchestration`.
+`test_point_in_time.py` (14), `test_cross_bu_feature.py` phần 1-5b + 7 (17),
+`test_agent_pipeline.py` (2). Đây là guard ngữ nghĩa của Sprint 2 — xoá thẳng là **làm yếu
+guard để test khỏi đỏ**, đúng thứ CLAUDE.md cấm.
 
-### ☐ Bước 9 — Cube (spike trước, quyết sau)
+Test singular sẵn có (`assert_vehicle_ownership_rules`, `assert_candidate_cross_bu_rules`…)
+**không thay thế được**: chúng chạy trên mock thật nên chỉ bắt được ca nào TÌNH CỜ có trong
+dữ liệu. Ba ca dưới đây gần như không bao giờ xuất hiện tự nhiên — và một ca thì không bao
+giờ, vì model còn không đọc tới cột đó:
 
-Chỉ triển khai nếu chứng minh được ít nhất một: nhiều dashboard dùng chung metric · cần nhất quán
-ngữ nghĩa giữa nhiều consumer · cần access control tập trung · cần cache/pre-aggregation.
-Acceptance: Metabase query được qua Cube · 5 metric mẫu khớp SQL chạy thẳng trên gold ·
-agent không bị ảnh hưởng · **tắt Cube thì bước 1–8 vẫn chạy**.
+| Ca | Vì sao singular test không thấy |
+|---|---|
+| lọc theo `recorded_at` thay vì event time | không model nào SELECT `recorded_at` — không có gì để so |
+| chi tiêu hai bên bằng nhau ⇒ `TIE` | dữ liệu thật gần như không có tie khác 0 |
+| khách chưa từng có dữ liệu ⇒ NULL, khác 0 | phải dựng khách thiếu hẳn một phía |
+| khách chỉ có VinFast, không có dòng GSM | mock sinh đủ dòng GSM cho mọi khách |
 
-### ☐ Bước 10 — Dọn dẹp
+Nên chuyển sang **dbt unit test** (`given`/`expect`, dữ liệu dựng sẵn, không đọc bảng thật) —
+đúng 1-1 với "thuần hàm, không chạm DB" của bản Python:
 
-- `docs/database_structure.md:5,7` trỏ tới `current_schema_postgresql.sql` và
-  `generate_structure_doc.py` — **cả hai không tồn tại**. Viết script thật hoặc sửa doc.
-  Doc cũng đang là bản `0014`, cần sinh lại cho `0015`.
-- **ADR 0004** `docs/adr/0004-dbt-transform-layer.md`: ranh giới Alembic/dbt, vì sao publish
-  bằng script chứ không dùng dbt incremental, vì sao hoãn Airbyte, chiến lược incremental filter
-  cho tương lai (`earliest_affected = min(status_at, handed_over_at, reversed_at, trip_start_time)`).
-  CLAUDE.md §9 ghi "dbt/Cube — considered and deferred; record as an ADR if revisited" — đây là lúc đó.
-- Cập nhật CLAUDE.md §9 sau khi có ADR 0004.
+```
+dbt/models/silver/unit_tests.yml
+    quyen_so_huu_xe_theo_moc_thoi_gian            4 bản ghi bàn giao × 2 snapshot = 8 dòng
+    tu_cach_nguoi_mua_khong_phu_thuoc_ngay_giao   mua không phụ thuộc ngày giao
+dbt/models/int/unit_tests.yml
+    cross_bu_null_khac_zero_va_dominant           5 khách: chỉ-GSM · chỉ-VF · TIE · 0 · NULL
+dbt/tests/assert_mock_dataset_covers_edge_cases.sql   (tag dev_only)
+    bản port phần ĐỘ PHỦ của data_quality_errors(): bộ mock có đủ ca biên không
+dbt/tests/assert_no_future_events_in_snapshot.sql
+    + nhánh days_since_* < 0  ⇒ sự kiện nằm sau snapshot
+```
+
+`assert_mock_dataset_covers_edge_cases` mang tag `dev_only` vì nó gắn với BỘ MOCK chứ không
+phải pipeline: warehouse thật hoàn toàn có thể hợp lệ mà thiếu một cohort.
+Chạy trên dữ liệu thật thì `dbt build --exclude tag:dev_only`.
+
+Python giữ lại đúng phần dbt không thấy được — **ý định của bộ sinh**:
+`test_delivered_order_status_agrees_with_handover` và
+`test_raw_events_cover_the_edge_cases_dbt_tests_rely_on` (đỏ ngay tại nguồn nếu
+generate_raw ngừng sinh handover đảo / sự kiện về trễ, thay vì đỏ sau cả một lần build).
+
+#### Bẫy gặp phải
+
+**`numeric` của Postgres giữ scale RIÊNG cho từng giá trị.** `sum()` ra `600.00`,
+`round(x, 4)` ra `0.0000`, literal `1.0` ra `1.0`. YAML parse `600.00` thành float
+`600.0` và unit test đỏ vì lệch định dạng. Ghim bằng **chuỗi**: `"600.00"`.
+
+**Partial parse che mất sửa đổi trong file YAML unit test.** Sửa `expect` rồi chạy lại vẫn
+thấy giá trị cũ trong diff. Dùng `--no-partial-parse` khi đang chỉnh unit test.
+
+#### Nghiệm thu (đã chạy trên PG 18.4 từ xa)
+
+Mọi guard mới đều đã bị **tiêm bug để kiểm ngược**, không guard nào chỉ "xanh":
+
+| Bug tiêm vào | Guard bắt |
+|---|---|
+| `is_handed_over` lọc theo `recorded_at` | unit test silver — FAIL |
+| `is_owned` dùng `handover_status <> 'reversed'` | unit test silver — FAIL |
+| bỏ nhánh `TIE`, đổi `>` thành `>=` | unit test cross-BU — FAIL |
+| `coalesce(vinfast_spend, 0)` (NULL thành 0) | unit test cross-BU — FAIL |
+| giả vờ không có chuyến bị huỷ | assert_mock_dataset — FAIL |
+
+```
+generate_mock_data      1000 khách · 25.505 trip · 6.781 đơn · feature.* để RỖNG
+run_dbt build           PASS=89  (5 view, 3 table, 78 data test, 3 unit test)
+publish_gold            0 -> 6000 dòng mỗi bảng
+parity_check --verify   PARITY OK   (2 ô tỷ lệ được tha)
+contract_check --verify CONTRACT OK
+pytest                  148 passed
+run_eval --offline      gold_sql_ok 72/72 · retrieval 59/72 · refusal 23/28  = baseline
+```
+
+`0 -> 6000` là chỗ đáng nhìn: seed đã thực sự dọn sạch `feature.*` và toàn bộ 18.000 dòng
+gold hiện tại đến từ dbt, không còn dòng nào sót lại của đường Python.
+
+### ◑ Bước 8 — Dagster: khung xong, phần phụ thuộc nguồn dữ liệu để lại
+
+`backend/orchestration/definitions.py` — 3 asset, 2 job:
+
+```
+raw_events  ->  dbt_models  ->  gold_tables      dev_seed_job   bấm tay
+                dbt_models  ->  gold_tables      nightly_job    sẽ hẹn giờ
+```
+
+`raw_events` xoá sạch `raw.*` + `feature.*` rồi sinh lại, nên **không bao giờ** được nằm
+trong job có lịch. Khi cắm dữ liệu thật, nửa trái bị thay bằng nguồn ingest, `nightly_job`
+dùng lại nguyên vẹn — đó là toàn bộ lý do tách đôi.
+
+Chạy:
+
+```powershell
+cd backend
+$env:DAGSTER_HOME = "$PWD\.dagster"     # không đặt thì mất lịch sử chạy
+.\.venv\Scripts\dagster.exe dev -m orchestration.definitions
+.\.venv\Scripts\dagster.exe job execute -m orchestration.definitions -j nightly_job
+```
+
+`seed_metadata` không cần asset riêng: `generate_mock_data.seed()` đã gọi nó. Khi tách khỏi
+mock generator thì phải tách ra, và **không** cho chạy hàng đêm — nó đè synonym chỉnh tay.
+
+#### Ba bẫy đã cắn thật
+
+**Tiến trình con của Dagster không import được `scripts.*`.** Gọi thẳng hàm asset trong tiến
+trình cha thì chạy tốt; qua executor thì `ModuleNotFoundError`, kể cả sau khi chèn `backend/`
+vào `sys.path` ở đầu file định nghĩa. Không gọt sys.path cho vừa — cả ba asset đi bằng
+`subprocess` với `cwd=backend/`. Đổi lại còn được hai thứ: `.env` chắc chắn đọc đúng dù chạy
+Dagster từ đâu, và `SystemExit` của `publish_gold` thành exit code, tức một lần chạy đỏ gọn.
+
+**`from __future__ import annotations` làm Dagster không nhận ra `AssetExecutionContext`.**
+Nó biến annotation thành chuỗi, mà Dagster kiểm kiểu tham số `context` ngay lúc định nghĩa
+asset → `DagsterInvalidDefinitionError`. File này cố ý không có dòng đó.
+
+**UTF-8.** `run_dbt.py` chỉ tự re-exec với `-X utf8` khi chạy như `__main__`. Import rồi gọi
+`main()` là dbt chết `UnicodeDecodeError` ở comment tiếng Việt. `_chay_script` luôn thêm
+`-X utf8`.
+
+#### Nghiệm thu
+
+| Thử | Kết quả |
+|---|---|
+| `nightly_job` có `raw_events` không | resolve ra `['dbt_models','gold_tables']` — **không có** |
+| dbt test đỏ (tiêm 1 test luôn fail) | `dbt_models` FAIL, `gold_tables` **không chạy**, PARITY OK |
+| `dev_seed_job` chạy trọn | 3/3 STEP_SUCCESS, 36 giây |
+| Tắt Dagster, gõ 3 lệnh tay | vẫn chạy y hệt |
+| webserver | HTTP 200, thấy 2 job + 3 asset |
+| sau khi chạy | parity OK · contract OK · pytest 148 passed |
+
+#### Cố ý CHƯA làm — vì còn phụ thuộc nguồn dữ liệu
+
+- **Lịch chạy.** `SNAPSHOT_DATE` đang ghim `2026-08-01` nên chạy đêm ra kết quả y hệt. Trước
+  khi bật lịch phải trả lời: **ai INSERT ngày snapshot mới vào `raw.feature_snapshot`?** Hiện
+  6 ngày đó do Python sinh như hằng số; với dữ liệu thật thì không ai làm việc này.
+  `execution_timezone` phải khớp `business_timezone` của dbt (đang UTC).
+- **Asset check "raw đã tươi chưa".** Phải biết dữ liệu về bằng đường nào mới viết đúng.
+  Không có nó, một đêm nguồn đổ dở sẽ khiến nightly tính ra số thiếu rồi **ghi đè** gold.
+- **Retry + khoá đồng thời.** Pool limit 1 phải bao **cả** `dbt_models` lẫn `gold_tables`:
+  `dbt build` DROP bảng `dbt_work` mà lần chạy kia đang publish. Một người dùng thì chưa xảy ra.
+- **`run_eval` trong `dev_seed_job`.** Nếu thêm, phải ghim `--offline`, không thì mỗi lần
+  seed là một lần gọi LLM tốn tiền.
+- **Service `dagster` trong docker-compose (profile `orchestration`).** Vướng nợ có sẵn:
+  compose ép `DATABASE_URL` về `db:5432` trong khi `.env` trỏ server từ xa.
+
+### ✅ Bước 9 — Cube: **không dùng**
+
+Cổng đã đặt từ đầu là "chỉ triển khai khi chứng minh được ít nhất MỘT trong bốn điều kiện".
+Đo ngày 2026-08-07 trên hệ thống thật: **0/4**.
+
+| Điều kiện | Đo được |
+|---|---|
+| Nhiều dashboard dùng chung metric | không có dashboard nào |
+| Nhất quán ngữ nghĩa giữa nhiều consumer | **CÓ 2 consumer** (Metabase nối thẳng `feature.*`) — nhưng ở đây metric là một **CỘT đã tính sẵn**, không phải công thức, nên hai bên không thể ra hai số khác nhau |
+| Access control tập trung | rủi ro có thật nhưng chữa bằng **1 dòng SQL** (`metabase_reader IN ROLE feature_agent_reader`), không cần một service |
+| Cache / pre-aggregation | 8,8–14,9 ms trên 18.000 dòng. Và `feature.*` **đã là** bản pre-aggregate |
+
+Chi phí nếu làm: mô tả lại 381 feature queryable thành tầng ngữ nghĩa thứ hai, trong khi
+`semantic_layer.yaml` được **sinh tự động** từ `feature_spec.py` — bản viết tay sẽ trôi ngay
+lần đầu ai thêm feature.
+
+Quyết định đầy đủ, kèm số đo và **ngưỡng cụ thể để mở lại**:
+`decisions.md#0005`.
+
+### ☐ Ba việc phát sinh vì Metabase nối thẳng — độc lập với Cube
+
+Đo được ngày 2026-08-07, xếp theo ưu tiên. Chi tiết trong ADR 0005.
+
+| # | Việc | Vì sao |
+|---|---|---|
+| 1 | `CREATE ROLE metabase_reader ... IN ROLE feature_agent_reader` | superuser thì Metabase thấy `raw.customers` (PII), `silver`, `dbt_work`, `agent.query_log` |
+| 2 | View chỉ phơi snapshot mới nhất | quên `where snapshot_date` ⇒ **sai 6,3 lần** (2,12 tỷ thay vì 336 triệu) |
+| 3 | Đẩy 381 mô tả tiếng Việt vào `COMMENT ON COLUMN` | hiện **7/464 cột** có mô tả; Metabase lấy mô tả từ đó |
+
+Việc 3 cần migration Alembic (DDL của `feature.*` do Alembic sở hữu) và phải chạy lại
+`contract_check --snapshot` sau đó.
+
+### ✅ Bước 10 — Dọn dẹp
+
+**[ADR 0004](decisions.md#0004)** — ranh giới Alembic/dbt, vì sao publish bằng
+script chứ không dùng dbt incremental (ba lý do độc lập), vì sao hoãn Airbyte, chiến lược
+incremental filter tương lai, và **4 câu còn mở phải trả lời trước khi cắm warehouse thật**.
+
+**`docs/database_structure.md`** — bỏ câu "sinh tự động". Nó trỏ tới
+`current_schema_postgresql.sql` và `generate_structure_doc.py`, **cả hai chưa bao giờ tồn
+tại**; câu đó làm người đọc tưởng doc tự cập nhật, nên nó đứng ở `0014` trong khi head là
+`0015`. Nay ghi rõ là viết tay, và trỏ sang thứ kiểm được bằng máy:
+`gold_contract.json` + `contract_check --verify`. Đã cập nhật số: 7 schema, 24 bảng, 6 view.
+
+**`backend/db/schema/sprint1_feature_store_schema_postgresql.sql`** — kế hoạch ghi "lệch 13
+revision so với head → thêm cảnh báo hoặc **xoá**". **Không được xoá**: migration `0001` đọc
+và thực thi file này nguyên văn, xoá là gãy `alembic upgrade head` từ đầu. Chênh 14 revision
+là ĐÚNG — nó là trạng thái đông cứng của Sprint 1. Đã thêm header cấm cập nhật cho khớp head.
+
+**CLAUDE.md §16** — dbt chuyển từ "out of scope" sang trong phạm vi, kèm ranh giới quyền.
+Cube và Airbyte vẫn ngoài phạm vi, nay có ADR chống lưng. §14 ghi rõ generator chỉ sinh raw.
 
 ---
 

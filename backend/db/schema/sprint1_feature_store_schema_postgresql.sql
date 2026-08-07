@@ -1,4 +1,20 @@
 -- ============================================================================
+-- ĐỪNG CẬP NHẬT FILE NÀY CHO KHỚP HEAD.
+--
+-- Đây là trạng thái ĐÃ ĐÔNG CỨNG của Sprint 1, được migration 0001 đọc và thực thi
+-- NGUYÊN VĂN (backend/migrations/versions/0001_initial_schema.py). Sửa nó là sửa lại
+-- quá khứ: mọi database dựng từ đầu sẽ đi một đường khác với database đã tồn tại.
+--
+-- Head hiện tại là 0015, cách file này 14 revision. Chênh lệch đó là ĐÚNG, không phải
+-- nợ kỹ thuật. Thay đổi schema đi bằng migration mới trong migrations/versions/.
+--
+-- Muốn xem cấu trúc HIỆN TẠI:
+--   docs/database_structure.md                  bản đồ để đọc
+--   backend/db/gold_contract.json               bản chụp feature.* kiểm được bằng máy
+--   python -m scripts.contract_check --verify   so DB thật với bản chụp đó
+--
+-- Chỉ được thêm/sửa COMMENT trong file này. Thêm SQL là đổi lịch sử migration.
+-- ============================================================================
 -- FEATURE STORE QUERY & REPORTING AGENT
 -- SPRINT 1 DATABASE SCHEMA
 -- Target: PostgreSQL 14+

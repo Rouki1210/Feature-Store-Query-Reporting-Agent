@@ -1,0 +1,147 @@
+version: 2
+
+# Unit test cho bảng cross-BU. Dữ liệu dựng sẵn, không đọc bảng thật.
+#
+# Bản port của backend/tests/test_cross_bu_feature.py (phần 1-5b) — file đó test hàm
+# build_cross_bu(), đã bị xoá ở bước cutover (docs/dbt_migration_runbook.md bước 7).
+#
+# Vì sao không để tests/assert_candidate_cross_bu_rules.sql gánh hết: test đó chạy trên
+# mock thật và chỉ bắt được ca nào TÌNH CỜ có trong dữ liệu. Ba ca dưới đây gần như
+# không bao giờ xuất hiện tự nhiên:
+#   * chi tiêu hai bên BẰNG NHAU và khác 0  -> phải ra TIE, không được im lặng chọn GSM
+#   * khách chưa từng có dữ liệu ở một đơn vị -> NULL, khác hẳn 0
+#   * khách chỉ có VinFast, không có dòng GSM nào -> vẫn phải có mặt
+
+unit_tests:
+  - name: cross_bu_null_khac_zero_va_dominant
+    model: int_cross_bu_candidate
+    description: >
+      Năm khách, mỗi người một cách hỏng:
+
+        K1  chỉ GSM        vinfast_spend NULL (chưa từng), combined vẫn = 100 chứ không NULL.
+                           Có thêm chuyến năm 2024 để chốt: cửa sổ `all` lấy từ tầng
+                           silver, KHÔNG phải lấy tạm l12m của bảng candidate.
+        K2  chỉ VinFast    không có dòng GSM nào ⇒ vẫn phải ra dòng (contract là FULL
+                           OUTER). Là chủ xe nhưng không hoạt động GSM ⇒ cờ tắt.
+        K3  bằng nhau      200 vs 200 ⇒ TIE. Đây là ca mà `case when gsm > vf then 'GSM'
+                           else 'VINFAST' end` sẽ trả lời sai mà không ai thấy.
+        K4  có mà kỳ này 0 vinfast_spend = 0, KHÔNG phải NULL. Trộn hai thứ này thì mọi
+                           AVG chi tiêu đều sai trong khi SQL vẫn đúng cú pháp.
+        K5  cả hai đều 0   không có gì để so ⇒ dominant NULL và score NULL.
+
+    given:
+      - input: ref('silver_customer_snapshot')
+        rows:
+          - {customer_id: 1, snapshot_date: "2026-06-30"}
+          - {customer_id: 2, snapshot_date: "2026-06-30"}
+          - {customer_id: 3, snapshot_date: "2026-06-30"}
+          - {customer_id: 4, snapshot_date: "2026-06-30"}
+          - {customer_id: 5, snapshot_date: "2026-06-30"}
+
+      - input: ref('silver_gsm_trip')
+        rows:
+          # Ngoài mọi cửa sổ (l12m) nhưng vẫn phải vào `all`.
+          - {trip_id: 1, customer_id: 1, trip_date: "2024-01-01", status_group: "completed", total_fare: 500}
+          - {trip_id: 2, customer_id: 1, trip_date: "2026-06-01", status_group: "completed", total_fare: 100}
+          - {trip_id: 3, customer_id: 3, trip_date: "2026-06-01", status_group: "completed", total_fare: 200}
+          - {trip_id: 4, customer_id: 4, trip_date: "2026-06-01", status_group: "completed", total_fare: 500}
+          # K5 có đi GSM nhưng huỷ hết ⇒ ever_gsm = true, chi tiêu = 0 (khác NULL).
+          - {trip_id: 5, customer_id: 5, trip_date: "2026-06-01", status_group: "canceled", total_fare: 0}
+
+      - input: source('raw', 'vinfast_orders')
+        rows:
+          - {order_id: 20, customer_id: 2, created_at: "2026-06-01 10:00:00+00"}
+          - {order_id: 30, customer_id: 3, created_at: "2026-06-01 10:00:00+00"}
+          # K4 có lịch sử đơn từ 2025 ⇒ ever_vf = true dù kỳ này không chi.
+          - {order_id: 40, customer_id: 4, created_at: "2025-01-01 10:00:00+00"}
+          - {order_id: 50, customer_id: 5, created_at: "2026-06-01 10:00:00+00"}
+
+      - input: ref('silver_vinfast_order_state')
+        rows:
+          - {order_id: 20, customer_id: 2, snapshot_date: "2026-06-30", status: "completed", paid_amount: 300}
+          - {order_id: 30, customer_id: 3, snapshot_date: "2026-06-30", status: "completed", paid_amount: 200}
+          - {order_id: 40, customer_id: 4, snapshot_date: "2026-06-30", status: "cancelled", paid_amount: 900}
+          - {order_id: 50, customer_id: 5, snapshot_date: "2026-06-30", status: "cancelled", paid_amount: 0}
+
+      - input: ref('int_gsm_feature_candidate')
+        rows:
+          - {customer_id: 1, snapshot_date: "2026-06-30", completed_original_price_sum_l1m: 100, completed_txn_count_l1m: 1}
+          - {customer_id: 2, snapshot_date: "2026-06-30", completed_original_price_sum_l1m: null, completed_txn_count_l1m: 0}
+          - {customer_id: 3, snapshot_date: "2026-06-30", completed_original_price_sum_l1m: 200, completed_txn_count_l1m: 1}
+          - {customer_id: 4, snapshot_date: "2026-06-30", completed_original_price_sum_l1m: 500, completed_txn_count_l1m: 1}
+          - {customer_id: 5, snapshot_date: "2026-06-30", completed_original_price_sum_l1m: 0, completed_txn_count_l1m: 0}
+
+      - input: ref('int_vinfast_feature_candidate')
+        rows:
+          - {customer_id: 1, snapshot_date: "2026-06-30", txn_completed_amount_sum_l1m: null, txn_completed_count_l1m: 0, is_vehicle_owner: false}
+          - {customer_id: 2, snapshot_date: "2026-06-30", txn_completed_amount_sum_l1m: 300, txn_completed_count_l1m: 1, is_vehicle_owner: true}
+          - {customer_id: 3, snapshot_date: "2026-06-30", txn_completed_amount_sum_l1m: 200, txn_completed_count_l1m: 1, is_vehicle_owner: false}
+          - {customer_id: 4, snapshot_date: "2026-06-30", txn_completed_amount_sum_l1m: 0, txn_completed_count_l1m: 0, is_vehicle_owner: false}
+          - {customer_id: 5, snapshot_date: "2026-06-30", txn_completed_amount_sum_l1m: 0, txn_completed_count_l1m: 0, is_vehicle_owner: false}
+
+    expect:
+      rows:
+        - customer_id: 1
+          is_active_gsm_l1m: true
+          is_active_vinfast_l1m: false
+          is_cross_bu_active_l1m: false
+          gsm_spend_l1m: 100
+          vinfast_spend_l1m: null        # chưa từng có đơn VinFast
+          combined_spend_l1m: 100        # không phải NULL, không phải 0
+          dominant_business_unit_l1m: "GSM"
+          gsm_spend_all: "600.00"          # 500 (2024) + 100 — lấy từ silver, không phải l12m
+          vinfast_spend_all: null
+          cross_bu_engagement_score: "0.0000"
+          gsm_active_vehicle_owner_flag: false
+
+        - customer_id: 2
+          is_active_gsm_l1m: false
+          is_active_vinfast_l1m: true
+          is_cross_bu_active_l1m: false
+          gsm_spend_l1m: null            # chưa từng đi GSM
+          vinfast_spend_l1m: 300
+          combined_spend_l1m: 300
+          dominant_business_unit_l1m: "VINFAST"
+          gsm_spend_all: null
+          vinfast_spend_all: "300.00"
+          cross_bu_engagement_score: "0.0000"
+          gsm_active_vehicle_owner_flag: false   # là chủ xe nhưng không hoạt động GSM
+
+        - customer_id: 3
+          is_active_gsm_l1m: true
+          is_active_vinfast_l1m: true
+          is_cross_bu_active_l1m: true
+          gsm_spend_l1m: 200
+          vinfast_spend_l1m: 200
+          combined_spend_l1m: 400
+          dominant_business_unit_l1m: "TIE"      # bằng nhau: nói rõ, không chọn bừa GSM
+          gsm_spend_all: "200.00"
+          vinfast_spend_all: "200.00"
+          cross_bu_engagement_score: "1.0"
+          gsm_active_vehicle_owner_flag: false
+
+        - customer_id: 4
+          is_active_gsm_l1m: true
+          is_active_vinfast_l1m: false
+          is_cross_bu_active_l1m: false
+          gsm_spend_l1m: 500
+          vinfast_spend_l1m: 0           # có lịch sử đơn, kỳ này không chi ⇒ 0 chứ không NULL
+          combined_spend_l1m: 500
+          dominant_business_unit_l1m: "GSM"
+          gsm_spend_all: "500.00"
+          vinfast_spend_all: 0
+          cross_bu_engagement_score: "0.0000"
+          gsm_active_vehicle_owner_flag: false
+
+        - customer_id: 5
+          is_active_gsm_l1m: false
+          is_active_vinfast_l1m: false
+          is_cross_bu_active_l1m: false
+          gsm_spend_l1m: 0
+          vinfast_spend_l1m: 0
+          combined_spend_l1m: 0
+          dominant_business_unit_l1m: null       # không có gì để so
+          gsm_spend_all: 0
+          vinfast_spend_all: 0
+          cross_bu_engagement_score: null
+          gsm_active_vehicle_owner_flag: false

@@ -226,10 +226,14 @@ Bootstrap bằng database admin (mặc định trong `.env.example` là `postgre
 .venv\Scripts\alembic.exe upgrade head
 .venv\Scripts\python.exe -m scripts.generate_semantic_layer
 .venv\Scripts\python.exe -m scripts.generate_mock_data
+.venv\Scripts\python.exe -m scripts.run_dbt build
+.venv\Scripts\python.exe -m scripts.publish_gold
 .venv\Scripts\python.exe -m scripts.seed_golden_set
 ```
 
-`generate_mock_data` xóa và nạp lại dữ liệu mock trong `raw` và `feature`.
+`generate_mock_data` chỉ sinh event thô vào `raw` (và xóa `feature.*` vì gold suy ra
+từ raw). `feature.*` do dbt tính rồi `publish_gold` ghi sang — bỏ hai lệnh giữa thì
+`feature.*` rỗng. Xem `docs/dbt_migration_runbook.md`.
 
 ### Runtime role
 

@@ -85,7 +85,13 @@ khách này có phải chủ xe không"** — cần event log, không phải c�
 
 **Quan hệ giữa hai nguồn (bắt buộc nhất quán):** handover là nguồn sự thật; `delivered` của
 đơn xe được **suy ra** từ nó. Mock generator sinh theo đúng chiều đó, và
-`data_quality_errors()` đỏ nếu có đơn xe `delivered` mà không có bản ghi bàn giao (hoặc ngược lại).
+`backend/tests/test_point_in_time.py::test_delivered_order_status_agrees_with_handover`
+đỏ nếu có đơn xe `delivered` mà không có bản ghi bàn giao (hoặc ngược lại).
+
+Quy tắc quyền sở hữu được canh ở tầng dbt (từ bước 7, `docs/dbt_migration_runbook.md`):
+`dbt/models/silver/unit_tests.yml` cho bốn ca point-in-time dựng sẵn,
+`dbt/tests/assert_vehicle_ownership_rules.sql` và `assert_candidate_buyer_owner.sql`
+cho toàn bộ dữ liệu.
 
 Đơn phụ kiện/dịch vụ vẫn dùng `delivered` bình thường — chúng không có handover, và cũng
 không liên quan tới quyền sở hữu xe.
@@ -117,7 +123,7 @@ Feature tại `snapshot_date = D` chỉ được dùng sự kiện có **event t
 | `updated_at` | trạng thái mới nhất | ❌ tuyệt đối không |
 
 Hệ quả — **late-arriving event vẫn được tính**: sự kiện xảy ra ngày 10 nhưng ghi nhận ngày 40
-vẫn thuộc snapshot ngày 30. Lý do và đánh đổi: xem `docs/adr/0002-event-time-not-ingest-time.md`.
+vẫn thuộc snapshot ngày 30. Lý do và đánh đổi: xem `decisions.md#0002`.
 
 Hệ quả — **reversed sau snapshot không ảnh hưởng snapshot đó**: khách trả xe ngày 40 thì tại
 snapshot ngày 30 họ **vẫn là owner**. Snapshot là ảnh quá khứ, không phải trạng thái hiện tại.

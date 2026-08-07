@@ -1,0 +1,124 @@
+version: 2
+
+# Unit test: dữ liệu DỰNG SẴN, không đọc bảng thật.
+#
+# Vì sao cần bên cạnh tests/*.sql: test singular chạy trên mock data thật nên chỉ bắt
+# được lỗi khi dữ liệu TÌNH CỜ có ca đó. Bốn ca point-in-time dưới đây phải luôn được
+# kiểm, kể cả khi bộ mock đổi và không còn sinh ra chúng.
+#
+# Đây là bản port của backend/tests/test_point_in_time.py — file đó test hàm Python
+# _vehicle_pit(), đã bị xoá ở bước cutover (docs/dbt_migration_runbook.md bước 7).
+
+unit_tests:
+  - name: quyen_so_huu_xe_theo_moc_thoi_gian
+    model: silver_vehicle_ownership
+    description: >
+      Bốn cách hỏng của quyền sở hữu, mỗi bản ghi bàn giao là một cách:
+
+        H1  về trễ      recorded_at > snapshot nhưng handed_over_at <= snapshot
+                        ⇒ VẪN tính (ADR 0002). Lọc theo recorded_at sẽ nói khách
+                        chưa nhận xe trong khi họ đã nhận.
+        H2  đảo sau     trả xe 15/6 ⇒ ở snapshot 31/5 VẪN là chủ. handover_status
+                        của nó đã là 'reversed' (trạng thái HIỆN TẠI) — model phải
+                        bỏ qua cột đó và chỉ nhìn mốc thời gian.
+        H3  tương lai   bàn giao 15/6 ⇒ ở snapshot 31/5 chưa nhận, và lúc đó bản ghi
+                        vẫn đang là lịch hẹn.
+        H4  chỉ hẹn     handed_over_at NULL ⇒ không bao giờ là chủ, ở mọi snapshot.
+
+    given:
+      - input: source('raw', 'feature_snapshot')
+        rows:
+          - {snapshot_date: "2026-05-31"}
+          - {snapshot_date: "2026-06-30"}
+
+      - input: source('raw', 'vinfast_vehicle_handover')
+        rows:
+          - handover_id: 1
+            order_id: 10
+            customer_id: 1
+            vehicle_id: "VF-000010"
+            handover_status: "completed"
+            scheduled_at: "2026-05-12 10:00:00+00"
+            handed_over_at: "2026-05-20 10:00:00+00"
+            reversed_at: null
+            # Ghi nhận trễ 36 ngày. Không cột nào của model được đụng tới nó.
+            recorded_at: "2026-06-25 10:00:00+00"
+
+          - handover_id: 2
+            order_id: 20
+            customer_id: 2
+            vehicle_id: "VF-000020"
+            handover_status: "reversed"
+            scheduled_at: "2026-05-12 10:00:00+00"
+            handed_over_at: "2026-05-20 10:00:00+00"
+            reversed_at: "2026-06-15 10:00:00+00"
+            recorded_at: "2026-05-21 10:00:00+00"
+
+          - handover_id: 3
+            order_id: 30
+            customer_id: 3
+            vehicle_id: "VF-000030"
+            handover_status: "completed"
+            scheduled_at: "2026-05-12 10:00:00+00"
+            handed_over_at: "2026-06-15 10:00:00+00"
+            reversed_at: null
+            recorded_at: "2026-06-16 10:00:00+00"
+
+          - handover_id: 4
+            order_id: 40
+            customer_id: 4
+            vehicle_id: "VF-000040"
+            handover_status: "scheduled"
+            scheduled_at: "2026-05-12 10:00:00+00"
+            handed_over_at: null
+            reversed_at: null
+            recorded_at: "2026-05-12 10:00:00+00"
+
+    expect:
+      rows:
+        # snapshot 2026-05-31
+        - {handover_id: 1, snapshot_date: "2026-05-31", is_handed_over: true,  is_owned: true,  is_pending: false}
+        - {handover_id: 2, snapshot_date: "2026-05-31", is_handed_over: true,  is_owned: true,  is_pending: false}
+        - {handover_id: 3, snapshot_date: "2026-05-31", is_handed_over: false, is_owned: false, is_pending: true}
+        - {handover_id: 4, snapshot_date: "2026-05-31", is_handed_over: false, is_owned: false, is_pending: true}
+        # snapshot 2026-06-30
+        - {handover_id: 1, snapshot_date: "2026-06-30", is_handed_over: true,  is_owned: true,  is_pending: false}
+        # đã trả xe: mất quyền chủ, nhưng "đã từng nhận" là sự kiện lịch sử, không mất
+        - {handover_id: 2, snapshot_date: "2026-06-30", is_handed_over: true,  is_owned: false, is_pending: false}
+        - {handover_id: 3, snapshot_date: "2026-06-30", is_handed_over: true,  is_owned: true,  is_pending: false}
+        - {handover_id: 4, snapshot_date: "2026-06-30", is_handed_over: false, is_owned: false, is_pending: true}
+
+  - name: tu_cach_nguoi_mua_khong_phu_thuoc_ngay_giao
+    model: silver_vehicle_purchase
+    description: >
+      Mua và nhận là hai chuyện khác nhau (docs/vehicle_owner_semantics.md).
+
+      Đơn dưới đây chạm 'completed' ngày 10/5 rồi mới giao ngày 20/6, và raw đặt
+      `updated_at = handed_over_at` như generate_raw() vẫn làm. Ở snapshot 31/5 khách
+      PHẢI đã là người mua. Nếu ai đó đem bộ lọc as-of của order_state (lọc cả
+      updated_at) áp vào đây, dòng 31/5 biến mất — đúng lỗi đã đo được 257 đơn / 59 dòng.
+
+      `recorded_at` để trễ hẳn sang 6/7 để chốt luôn ADR 0002 ở tầng người mua.
+
+    given:
+      - input: source('raw', 'feature_snapshot')
+        rows:
+          - {snapshot_date: "2026-05-31"}
+          - {snapshot_date: "2026-06-30"}
+
+      - input: source('raw', 'vinfast_orders')
+        rows:
+          - {order_id: 10, customer_id: 1, order_type: "vehicle", status: "delivered", updated_at: "2026-06-20 10:00:00+00"}
+          # Đơn phụ kiện cũng chạm 'completed' — không được tính là mua xe.
+          - {order_id: 11, customer_id: 1, order_type: "accessories", status: "completed", updated_at: "2026-05-02 10:00:00+00"}
+
+      - input: source('raw', 'vinfast_order_status_history')
+        rows:
+          - {status_history_id: 1, order_id: 10, status: "completed", status_at: "2026-05-10 10:00:00+00", recorded_at: "2026-07-06 10:00:00+00"}
+          - {status_history_id: 2, order_id: 10, status: "delivered", status_at: "2026-06-20 10:00:00+00", recorded_at: "2026-06-21 10:00:00+00"}
+          - {status_history_id: 3, order_id: 11, status: "completed", status_at: "2026-05-02 10:00:00+00", recorded_at: "2026-05-02 10:00:00+00"}
+
+    expect:
+      rows:
+        - {order_id: 10, customer_id: 1, snapshot_date: "2026-05-31", completed_date: "2026-05-10"}
+        - {order_id: 10, customer_id: 1, snapshot_date: "2026-06-30", completed_date: "2026-05-10"}

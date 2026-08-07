@@ -238,29 +238,17 @@ def test_yaml_is_queryable_matches_support_status():
         assert f["is_queryable"] == (f["support_status"] == "queryable"), f["name"]
 
 
-def test_mock_canceled_features_are_populated():
-    # Guard bug spelling: feature "canceled" (1 L) phải map raw "cancelled" (2 L),
-    # nếu không mọi canceled_* = 0. Seed cố định nên deterministic.
+def test_mock_snapshots_are_pinned_and_ordered():
+    # Hai test cũ ở đây (ánh xạ canceled/cancelled, as-of nhiều snapshot) chạy qua
+    # build_features(); hàm đó đã bị xoá ở bước 7. Cả hai giờ nằm ở tầng dbt:
+    #   dbt/tests/assert_mock_dataset_covers_edge_cases.sql   canceled_* khác 0
+    #   dbt/tests/assert_no_future_events_in_snapshot.sql     days_since không âm
+    # Còn lại đúng phần Python vẫn sở hữu: danh sách ngày snapshot.
     import scripts.generate_mock_data as g
 
-    customers, _dates, trips, orders, *_events = g.generate_raw()
-    gsm, vf = g.build_features(customers, trips, orders)
-    assert sum(1 for r in gsm if r.get("canceled_txn_count_l12m")) > 0
-    assert sum(1 for r in vf if r.get("txn_canceled_count_l12m")) > 0
-
-
-def test_mock_multi_snapshot_as_of():
-    # Multi-snapshot: mỗi snapshot chỉ tính sự kiện <= ngày đó (as-of). Nếu quên
-    # pre-filter, days_since sẽ âm (snapshot - sự kiện tương lai). + genuine null.
-    import scripts.generate_mock_data as g
-
-    assert len(g.SNAPSHOTS) >= 2 and g.SNAPSHOTS[-1] == g.SNAPSHOT
-    cs, _d, tr, od, hist, hand = g.generate_raw()
-    gsm, vf = g.build_features(cs, tr, od, g.SNAPSHOTS[0], hist, hand)  # snapshot cũ nhất
-    assert all(r["snapshot_date"] == g.SNAPSHOTS[0] for r in gsm)
-    assert all(v is None or v >= 0 for v in (r.get("days_since_last_txn_l12m") for r in gsm))
-    null_cust = next(r for r in vf if r["customer_id"] == 8)  # cid%8==0 → không có đơn VF
-    assert null_cust.get("completed_order_count_l1m") in (0, None)
+    assert len(g.SNAPSHOTS) >= 2
+    assert g.SNAPSHOTS[-1] == g.SNAPSHOT           # mới nhất = ngày đã ghim trong .env
+    assert list(g.SNAPSHOTS) == sorted(g.SNAPSHOTS)  # cũ → mới, dbt dựa vào thứ tự này
 
 
 def test_migration_inventory_matches_feature_spec():

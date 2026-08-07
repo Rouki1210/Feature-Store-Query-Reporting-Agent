@@ -162,9 +162,9 @@ vehicle_owner_semantics.md
 join_policy.md
 short_term_state_contract.md
 
-adr/0001-cross-bu-precomputed-table.md
-adr/0002-event-time-not-ingest-time.md
-adr/0003-no-global-aggregate-layer-in-sprint-2.md
+docs/decisions.md#0001
+docs/decisions.md#0002
+docs/decisions.md#0003
 ```
 
 ---
@@ -507,6 +507,16 @@ validator versions before the release holdout run.
 Generate raw-like events, then derive approved features. Do not randomize feature
 columns independently.
 
+`scripts/generate_mock_data.py` produces the raw events **only**. Deriving features is
+dbt's job (`docs/decisions.md#0004`); the script deletes `feature.*` because
+gold is derived from raw, and prints the two commands that repopulate it:
+
+```text
+python -m scripts.generate_mock_data   # raw.* only, feature.* left EMPTY
+python -m scripts.run_dbt build        # silver -> dbt_work, runs every test
+python -m scripts.publish_gold         # dbt_work -> feature.*, one transaction
+```
+
 Inputs:
 
 - customers;
@@ -590,7 +600,17 @@ Reporter hard rules:
 - Forecasting unless separately approved.
 - Returned-vehicle or ownership-transfer semantics without approved features.
 - Arbitrary user-triggered write actions.
-- dbt and Cube unless reopened through an ADR.
+- Cube. Evaluated and rejected — `docs/decisions.md#0005` records the four
+  criteria, the measurements, and the concrete thresholds for reopening.
+- Airbyte, until a real external source exists (`docs/decisions.md#0004` §4).
+
+**dbt is now in scope** — reopened through `docs/decisions.md#0004`. It owns
+`silver` and `dbt_work` only. Alembic still owns every DDL statement on `feature.*`;
+`scripts/publish_gold.py` moves rows from `dbt_work` to `feature` in one transaction.
+dbt has no `CREATE` privilege on schema `feature`, enforced at the Postgres role level.
+
+Orchestration is Dagster (`backend/orchestration/definitions.py`): `dev_seed_job` is
+manual and may rebuild raw; `nightly_job` is scheduled and must never touch raw.
 
 The proactive reporter may publish approved scheduled reports through configured
 delivery adapters. This does not grant the query Agent arbitrary action-taking

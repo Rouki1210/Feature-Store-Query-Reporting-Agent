@@ -40,3 +40,7 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# --- Dagster ---
+# DAGSTER_HOME: lịch sử chạy, log, sqlite cục bộ. Không phải cấu hình.
+backend/.dagster/

@@ -26,3 +26,20 @@ select 'ownership: đã nhận xe sau snapshot mà vẫn tính là đã nhận',
        handover_id::text || ' @ ' || snapshot_date::text
   from {{ ref('silver_vehicle_ownership') }}
  where is_handed_over and handed_over_date > snapshot_date
+
+-- `days_since_*` = snapshot - ngày sự kiện. Âm nghĩa là sự kiện nằm SAU snapshot, tức
+-- rò dữ liệu tương lai ở tầng feature. Rẻ hơn nhiều so với việc đi dò từng cửa sổ.
+{% set recency = [
+    ('int_gsm_feature_candidate', 'days_since_first_txn_l12m'),
+    ('int_gsm_feature_candidate', 'days_since_last_txn_l12m'),
+    ('int_vinfast_feature_candidate', 'days_since_first_completed_txn_days_l12m'),
+    ('int_vinfast_feature_candidate', 'days_since_last_completed_txn_days_l12m'),
+    ('int_vinfast_feature_candidate', 'days_since_last_vehicle_handover'),
+] %}
+{% for model, col in recency %}
+union all
+select '{{ col }} âm ⇒ sự kiện nằm sau snapshot',
+       customer_id::text || ' @ ' || snapshot_date::text
+  from {{ ref(model) }}
+ where {{ col }} < 0
+{% endfor %}

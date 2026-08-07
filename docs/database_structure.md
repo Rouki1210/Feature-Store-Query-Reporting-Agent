@@ -1,10 +1,27 @@
 # Cấu trúc database — Feature Store Query & Reporting Agent
 
-**Alembic revision: `0014` (head)** · PostgreSQL 16+ · 5 schema, 20 bảng, 1 view
+**Alembic revision: `0015` (head)** · PostgreSQL 16+ (đang chạy 18.4) · 7 schema, 24 bảng, 6 view
 
-> Tài liệu này được **sinh tự động** từ [current_schema_postgresql.sql](../backend/db/schema/current_schema_postgresql.sql), bản thân file đó là `pg_dump` của database sau `alembic upgrade head`.
-> Nguồn sự thật là chuỗi migration trong [backend/migrations/versions/](../backend/migrations/versions/) — sửa schema bằng migration mới, không sửa tay file này.
-> Sinh lại: `python backend/db/schema/generate_structure_doc.py` (sau khi dump lại `.sql` theo hướng dẫn trong header file đó).
+> **Tài liệu này viết tay, KHÔNG sinh tự động.** Bản trước ghi là "sinh tự động" từ
+> `current_schema_postgresql.sql` bằng `generate_structure_doc.py` — **cả hai file đó chưa bao giờ tồn tại**.
+> Câu đó khiến người đọc tưởng doc tự cập nhật theo migration; thực tế nó đã đứng ở `0014` trong khi head là `0015`.
+>
+> Nguồn sự thật là chuỗi migration trong [backend/migrations/versions/](../backend/migrations/versions/) — sửa schema bằng migration mới.
+> Riêng `feature.*` có bản chụp **kiểm chứng được bằng máy**: `backend/db/gold_contract.json`,
+> so bằng `python -m scripts.contract_check --verify` (cột, constraint, index, ACL, comment).
+> Doc này chỉ là bản đồ để đọc; đừng dùng nó làm căn cứ khi hai bên lệch nhau.
+
+Thay đổi ở `0015` (xem [ADR 0004](decisions.md#0004)):
+
+| | |
+|---|---|
+| Schema mới | `silver` (5 view), `dbt_work` (3 bảng candidate) |
+| Bảng mới | `raw.feature_snapshot` — các ngày tính feature, nguồn dùng chung Python ↔ dbt |
+| Role mới | `dbt_transformer` — DML trên `feature.*`, **không** có `CREATE` trên schema đó |
+| Bị thu hồi | `feature_agent_reader` bị `REVOKE ALL` trên `silver` và `dbt_work` |
+
+Schema `parity` (3 bảng) không thuộc `0015`: đó là bản chụp đông cứng của `feature.*` do
+đường Python cũ sinh, dùng làm thước đo cho bản port. Không tái tạo được — xem ADR 0004.
 
 ## Dựng lại database
 
